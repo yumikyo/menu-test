@@ -17,7 +17,10 @@ from bs4 import BeautifulSoup
 import edge_tts
 import streamlit.components.v1 as components
 
+# 非同期処理の適用
 nest_asyncio.apply()
+
+# ページ設定
 st.set_page_config(page_title="Menu Player Generator", layout="wide")
 
 # ==========================================
@@ -39,36 +42,34 @@ def fetch_text_from_url(url):
         return "\n".join(lines)
     except: return None
 
-# 音声生成（単体）
-async def generate_single_track(text, filename, voice_code, rate_value, semaphore):
-    # セマフォを使って同時実行数を制限する（429エラー対策）
-    async with semaphore:
-        for attempt in range(3):
-            try:
-                comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
-                await comm.save(filename)
-                if os.path.exists(filename) and os.path.getsize(filename) > 0:
-                    return True
-            except:
-                # エラーが出たら少し待ってリトライ
-                await asyncio.sleep(2)
-        
-        # EdgeTTSがダメならGoogleTTS（予備）
+# ★最速モード用：制限なし生成関数
+async def generate_single_track_fast(text, filename, voice_code, rate_value):
+    # EdgeTTS (非同期)
+    for attempt in range(3):
         try:
-            def gtts_task():
-                tts = gTTS(text=text, lang='ja')
-                tts.save(filename)
-            await asyncio.to_thread(gtts_task)
-            return True
+            comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
+            await comm.save(filename)
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                return True
         except:
-            return False
-
-# 一括生成マネージャー（安全運転モード）
-async def process_all_tracks_safe(menu_data, output_dir, voice_code, rate_value, progress_bar):
-    # 同時に実行するのは「2つ」までにする（無料枠対策）
-    semaphore = asyncio.Semaphore(2)
-    tasks = []
+            await asyncio.sleep(1) # 短い待機で即リトライ
     
+    # GoogleTTS (予備)
+    try:
+        def gtts_task():
+            tts = gTTS(text=text, lang='ja')
+            tts.save(filename)
+        await asyncio.to_thread(gtts_task)
+        return True
+    except:
+        return False
+
+# ★最速モード用：一括並列処理マネージャー
+async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value, progress_bar):
+    tasks = []
+    track_info_list = []
+
+    # 全トラックのタスクを一気に登録（制限なし）
     for i, track in enumerate(menu_data):
         safe_title = sanitize_filename(track['title'])
         filename = f"{i+1:02}_{safe_title}.mp3"
@@ -77,30 +78,21 @@ async def process_all_tracks_safe(menu_data, output_dir, voice_code, rate_value,
         speech_text = track['text']
         if i > 0: speech_text = f"{i+1}、{track['title']}。\n{track['text']}"
         
-        tasks.append(generate_single_track(speech_text, save_path, voice_code, rate_value, semaphore))
+        # タスクリストに追加（待機なしで次々登録）
+        tasks.append(generate_single_track_fast(speech_text, save_path, voice_code, rate_value))
+        
+        # 結果用データ（順序保持のためここで作成）
+        track_info_list.append({"title": track['title'], "path": save_path})
 
     total = len(tasks)
     completed = 0
-    track_info_list = []
     
-    # 実行
-    for i, task in enumerate(asyncio.as_completed(tasks)):
+    # ヨーイドン！で全タスク並列実行
+    for task in asyncio.as_completed(tasks):
         await task
         completed += 1
         progress_bar.progress(completed / total)
-        # 順番が前後する可能性があるため、ファイルパスは再構築
-        # （簡易的な実装として、ここでは非同期完了順ではなくインデックス順でリストを作るために別途処理が必要だが
-        #  表示順序が多少前後してもプレイヤー側でソートされる仕組みならOK。
-        #  今回は確実性を重視して、最後にファイル一覧から再取得する方式をとる手もあるが、
-        #  一旦シンプルに返す）
     
-    # 完了後に正しい順序でリストを作成
-    for i, track in enumerate(menu_data):
-        safe_title = sanitize_filename(track['title'])
-        filename = f"{i+1:02}_{safe_title}.mp3"
-        save_path = os.path.join(output_dir, filename)
-        track_info_list.append({"title": track['title'], "path": save_path})
-
     return track_info_list
 
 def create_standalone_html_player(store_name, menu_data):
@@ -244,21 +236,17 @@ elif input_method == "📷 その場で撮影":
             st.session_state.show_camera = True
             st.rerun()
     else:
-        # ★カメラのガイド表示（日本語）★
         st.info("""
         ⚠️ **カメラの使い方のヒント**
         * **インカメラになる場合**: カメラ画面内の「Select Device」や「回転マーク」で切り替えてください。
         * **ボタンの意味**: 「Take Photo」＝ 撮影、「Clear Photo」＝ 撮り直し
         """)
-        
         camera_file = st.camera_input("📸 撮影（Take Photoを押してください）", key=f"camera_{st.session_state.camera_key}")
-        
         if camera_file:
             if st.button("⬇️ この写真を追加して次を撮る", type="primary"):
                 st.session_state.captured_images.append(camera_file)
                 st.session_state.camera_key += 1
                 st.rerun()
-        
         st.markdown("---")
         if st.button("❌ カメラを閉じる"):
             st.session_state.show_camera = False
@@ -274,7 +262,6 @@ elif input_method == "📷 その場で撮影":
                 if st.button(f"🗑️ No.{i+1} を削除（とりなおす）", key=f"del_{i}"):
                     del st.session_state.captured_images[i]
                     st.rerun()
-        
         st.divider()
         if st.button("🗑️ 全て削除して最初から"):
             st.session_state.captured_images = []
@@ -304,7 +291,7 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
     if os.path.exists(output_dir): shutil.rmtree(output_dir)
     os.makedirs(output_dir)
 
-    with st.spinner('AIが解析中...'):
+    with st.spinner('解析中...'):
         try:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(target_model_name)
@@ -327,15 +314,14 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
                 parts.append(prompt + f"\n\n{web_text[:30000]}")
 
             resp = None
-            # リトライ待機時間を少し長めに（安全策）
             for _ in range(3):
                 try: resp = model.generate_content(parts); break
-                except exceptions.ResourceExhausted: time.sleep(10) # 429エラー時は10秒待つ
+                except exceptions.ResourceExhausted: time.sleep(5)
                 except: pass
 
-            if not resp: st.error("失敗しました（アクセス集中）。少し待ってから再試行してください。"); st.stop()
+            if not resp: st.error("失敗しました"); st.stop()
 
-            text_resp = response.text if response else resp.text
+            text_resp = response.text
             start = text_resp.find('[')
             end = text_resp.rfind(']') + 1
             if start == -1: st.error("解析エラー"); st.stop()
@@ -349,9 +335,9 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
             menu_data.insert(0, {"title": "はじめに・目次", "text": intro_t})
 
             progress_bar = st.progress(0)
-            st.info("音声を生成しています... (安定モード動作中)")
-            # ★安全版の並列処理（同時2つまで）★
-            generated_tracks = asyncio.run(process_all_tracks_safe(menu_data, output_dir, voice_code, rate_value, progress_bar))
+            st.info("音声を生成しています... (並列処理中)")
+            # ★最速モード（Pro）の関数を呼び出し★
+            generated_tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value, progress_bar))
 
             html_str = create_standalone_html_player(store_name, generated_tracks)
             d_str = datetime.now().strftime('%Y%m%d')
