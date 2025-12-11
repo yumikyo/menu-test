@@ -84,9 +84,11 @@ if 'captured_images' not in st.session_state:
     st.session_state.captured_images = []
 if 'camera_key' not in st.session_state:
     st.session_state.camera_key = 0
-# 生成結果を保存する変数
 if 'generated_result' not in st.session_state:
     st.session_state.generated_result = None
+# ★カメラの表示・非表示を管理するスイッチ
+if 'show_camera' not in st.session_state:
+    st.session_state.show_camera = False
 
 # --- 入力モードの切り替えタブ ---
 tab_in1, tab_in2 = st.tabs(["📸 画像・カメラ", "🌐 Webリンク"])
@@ -103,24 +105,44 @@ with tab_in1:
     )
     
     st.markdown("### 2. その場で撮影（連続撮影可能）")
-    camera_file = st.camera_input("カメラを起動", key=f"camera_{st.session_state.camera_key}")
-
-    if camera_file:
-        if st.button("⬇️ この写真を追加して次を撮る", type="primary"):
-            st.session_state.captured_images.append(camera_file)
-            st.session_state.camera_key += 1
+    
+    # ★ここを変更：カメラの表示スイッチ機能★
+    if not st.session_state.show_camera:
+        # カメラがOFFのとき -> 起動ボタンを表示
+        if st.button("📷 カメラを起動する"):
+            st.session_state.show_camera = True
             st.rerun()
+    else:
+        # カメラがONのとき -> 停止ボタンとカメラ入力を表示
+        if st.button("❌ カメラを閉じる"):
+            st.session_state.show_camera = False
+            st.rerun()
+            
+        st.info("撮影したら下に表示される「追加ボタン」を押してください")
+        
+        # カメラ入力
+        camera_file = st.camera_input("シャッターを押す", key=f"camera_{st.session_state.camera_key}")
 
+        if camera_file:
+            if st.button("⬇️ この写真を追加して次を撮る", type="primary"):
+                st.session_state.captured_images.append(camera_file)
+                st.session_state.camera_key += 1
+                st.rerun()
+
+    # --- 画像リストの整理 ---
     if uploaded_files:
         final_image_list.extend(uploaded_files)
     if st.session_state.captured_images:
         final_image_list.extend(st.session_state.captured_images)
     
+    # リセットボタン
     if st.session_state.captured_images:
+        st.divider()
         if st.button("🗑️ 撮影した写真を全てクリア"):
             st.session_state.captured_images = []
             st.rerun()
 
+    # プレビュー表示
     if final_image_list:
         st.success(f"現在 {len(final_image_list)} 枚の画像がセットされています")
         cols = st.columns(len(final_image_list))
@@ -278,7 +300,6 @@ if st.button("🎙️ 音声メニューを作成する"):
                 # 音声生成
                 asyncio.run(generate_audio_safe(track['text'], save_path, voice_code, rate_value))
                 
-                # 結果リストに追加
                 generated_tracks.append({
                     "title": track['title'],
                     "path": save_path
@@ -297,14 +318,13 @@ if st.button("🎙️ 音声メニューを作成する"):
                     for file in files:
                         zipf.write(os.path.join(root, file), file)
 
-            # --- 結果をセッションステートに保存 ---
             st.session_state.generated_result = {
                 "zip_path": zip_path,
                 "zip_name": zip_filename,
                 "tracks": generated_tracks
             }
             
-            st.balloons() # 完成祝いのエフェクト
+            st.balloons()
 
         except Exception as e:
             st.error("エラーが発生しました")
@@ -320,12 +340,10 @@ if st.session_state.generated_result:
     st.markdown("## 🎉 生成完了！")
     st.info("以下から操作を選んでください。")
 
-    # タブで選択肢を表示
     tab_dl, tab_play = st.tabs(["📥 ダウンロード", "▶️ 今すぐ再生する"])
     
     with tab_dl:
         st.subheader("ZIPファイルで保存")
-        st.write("PCや他の端末で使いたい場合はこちら。")
         with open(result["zip_path"], "rb") as fp:
             st.download_button(
                 label=f"📦 {result['zip_name']} をダウンロード",
@@ -337,11 +355,7 @@ if st.session_state.generated_result:
 
     with tab_play:
         st.subheader("Webプレイヤーで確認")
-        st.write("ダウンロードせずに、この場で内容をチェックできます。")
-        
         for track in result["tracks"]:
-            st.markdown(f"**{os.path.basename(track['path'])}**") # ファイル名表示
+            st.markdown(f"**{os.path.basename(track['path'])}**")
             if os.path.exists(track['path']):
                 st.audio(track['path'])
-            else:
-                st.error("ファイルが見つかりません")
