@@ -17,21 +17,16 @@ from bs4 import BeautifulSoup
 import edge_tts
 import streamlit.components.v1 as components
 
-# 非同期処理の適用
 nest_asyncio.apply()
-
-# ページ設定
 st.set_page_config(page_title="Menu Player Generator", layout="wide")
 
 # ==========================================
 # 1. 関数定義群
 # ==========================================
 
-# ファイル名に使えない文字を削除
 def sanitize_filename(name):
     return re.sub(r'[\\/*?:"<>|]', "", name).replace(" ", "_").replace("　", "_")
 
-# URLからテキスト抽出
 def fetch_text_from_url(url):
     try:
         headers = {'User-Agent': 'Mozilla/5.0'}
@@ -45,29 +40,35 @@ def fetch_text_from_url(url):
     except: return None
 
 # 音声生成（単体）
-async def generate_single_track(text, filename, voice_code, rate_value):
-    for attempt in range(3):
+async def generate_single_track(text, filename, voice_code, rate_value, semaphore):
+    # セマフォを使って同時実行数を制限する（429エラー対策）
+    async with semaphore:
+        for attempt in range(3):
+            try:
+                comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
+                await comm.save(filename)
+                if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                    return True
+            except:
+                # エラーが出たら少し待ってリトライ
+                await asyncio.sleep(2)
+        
+        # EdgeTTSがダメならGoogleTTS（予備）
         try:
-            comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
-            await comm.save(filename)
-            if os.path.exists(filename) and os.path.getsize(filename) > 0:
-                return True
+            def gtts_task():
+                tts = gTTS(text=text, lang='ja')
+                tts.save(filename)
+            await asyncio.to_thread(gtts_task)
+            return True
         except:
-            await asyncio.sleep(1)
-    try:
-        def gtts_task():
-            tts = gTTS(text=text, lang='ja')
-            tts.save(filename)
-        await asyncio.to_thread(gtts_task)
-        return True
-    except:
-        return False
+            return False
 
-# 一括生成マネージャー
-async def process_all_tracks_parallel(menu_data, output_dir, voice_code, rate_value, progress_bar):
+# 一括生成マネージャー（安全運転モード）
+async def process_all_tracks_safe(menu_data, output_dir, voice_code, rate_value, progress_bar):
+    # 同時に実行するのは「2つ」までにする（無料枠対策）
+    semaphore = asyncio.Semaphore(2)
     tasks = []
-    track_info_list = []
-
+    
     for i, track in enumerate(menu_data):
         safe_title = sanitize_filename(track['title'])
         filename = f"{i+1:02}_{safe_title}.mp3"
@@ -76,19 +77,32 @@ async def process_all_tracks_parallel(menu_data, output_dir, voice_code, rate_va
         speech_text = track['text']
         if i > 0: speech_text = f"{i+1}、{track['title']}。\n{track['text']}"
         
-        tasks.append(generate_single_track(speech_text, save_path, voice_code, rate_value))
-        track_info_list.append({"title": track['title'], "path": save_path})
+        tasks.append(generate_single_track(speech_text, save_path, voice_code, rate_value, semaphore))
 
     total = len(tasks)
     completed = 0
-    for task in asyncio.as_completed(tasks):
+    track_info_list = []
+    
+    # 実行
+    for i, task in enumerate(asyncio.as_completed(tasks)):
         await task
         completed += 1
         progress_bar.progress(completed / total)
+        # 順番が前後する可能性があるため、ファイルパスは再構築
+        # （簡易的な実装として、ここでは非同期完了順ではなくインデックス順でリストを作るために別途処理が必要だが
+        #  表示順序が多少前後してもプレイヤー側でソートされる仕組みならOK。
+        #  今回は確実性を重視して、最後にファイル一覧から再取得する方式をとる手もあるが、
+        #  一旦シンプルに返す）
     
+    # 完了後に正しい順序でリストを作成
+    for i, track in enumerate(menu_data):
+        safe_title = sanitize_filename(track['title'])
+        filename = f"{i+1:02}_{safe_title}.mp3"
+        save_path = os.path.join(output_dir, filename)
+        track_info_list.append({"title": track['title'], "path": save_path})
+
     return track_info_list
 
-# HTMLプレイヤー作成
 def create_standalone_html_player(store_name, menu_data):
     playlist_js = []
     for track in menu_data:
@@ -124,7 +138,6 @@ au.onended=function(){{if(idx<pl.length-1)next();else pb.innerText="▶";}};
 function ren(){{const d=document.getElementById('ls');d.innerHTML="";pl.forEach((t,i)=>{{const m=document.createElement('div');m.className="itm "+(i===idx?"active":"");m.innerText=(i+1)+". "+t.title;m.onclick=()=>{{ld(i);au.play();pb.innerText="⏸";}};d.appendChild(m);}});}}
 init();</script></body></html>"""
 
-# プレビュープレイヤー表示関数
 def render_preview_player(tracks):
     playlist_data = []
     for track in tracks:
@@ -158,6 +171,16 @@ def render_preview_player(tracks):
     function rn(){{ls.innerHTML="";pl.forEach((t,i)=>{{const d=document.createElement('div');d.className="it "+(i===x?"active":"");d.innerText=(i+1)+". "+t.title;d.onclick=()=>{{ld(i);au.play();pb.innerText="⏸";}};ls.appendChild(d);}});}}
     init();</script></body></html>"""
     components.html(html_code, height=400)
+
+def render_share_button(html_content, file_name):
+    b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
+    share_code = f"""
+    <!DOCTYPE html><html><head><style>
+    .share-btn {{width:100%;padding:15px;background-color:#28a745;color:white;font-size:16px;font-weight:bold;border:none;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;}}
+    </style></head><body>
+    <button class="share-btn" onclick="shareFile()">📤 プレイヤーをLINEなどで送る (共有)</button>
+    <script>async function shareFile(){{const b64="{b64_html}";const fileName="{file_name}";try{{const byteCharacters=atob(b64);const byteNumbers=new Array(byteCharacters.length);for(let i=0;i<byteCharacters.length;i++){{byteNumbers[i]=byteCharacters.charCodeAt(i);}}const byteArray=new Uint8Array(byteNumbers);const blob=new Blob([byteArray],{{type:"text/html"}});const file=new File([blob],fileName,{{type:"text/html"}});if(navigator.share){{await navigator.share({{files:[file],title:'音声メニュー',text:'お店の音声メニューを送ります。'}});}}else{{alert("ブラウザが対応していません。下のダウンロードボタンを使ってください。");}}}}catch(e){{alert("共有失敗: "+e);}}}}</script></body></html>"""
+    components.html(share_code, height=60)
 
 # ==========================================
 # 2. UI設定
@@ -221,41 +244,33 @@ elif input_method == "📷 その場で撮影":
             st.session_state.show_camera = True
             st.rerun()
     else:
-        # ガイドメッセージ
+        # ★カメラのガイド表示（日本語）★
         st.info("""
         ⚠️ **カメラの使い方のヒント**
-        1. **インカメラになる場合**: カメラ画面内の「Select Device」などをタップして切り替えてください。
-        2. **ボタンの意味**: 「Take Photo」＝ 撮影、「Clear Photo」＝ 撮り直し
+        * **インカメラになる場合**: カメラ画面内の「Select Device」や「回転マーク」で切り替えてください。
+        * **ボタンの意味**: 「Take Photo」＝ 撮影、「Clear Photo」＝ 撮り直し
         """)
         
-        # カメラ入力
         camera_file = st.camera_input("📸 撮影（Take Photoを押してください）", key=f"camera_{st.session_state.camera_key}")
         
-        # 撮影後のボタン群（追加と閉じるを縦に並べる）
         if camera_file:
             if st.button("⬇️ この写真を追加して次を撮る", type="primary"):
                 st.session_state.captured_images.append(camera_file)
                 st.session_state.camera_key += 1
                 st.rerun()
-                
+        
         st.markdown("---")
-        # 閉じるボタンを下にも配置
         if st.button("❌ カメラを閉じる"):
             st.session_state.show_camera = False
             st.rerun()
 
-    # ★ここが新機能：個別削除（とりなおし）★
     if st.session_state.captured_images:
         st.markdown("#### 📸 撮影された写真リスト")
-        
-        # enumerateをリストコピーで行い、削除時のズレを防ぐ
         for i, img in enumerate(st.session_state.captured_images):
             c_img, c_del = st.columns([1, 2])
-            with c_img:
-                st.image(img, width=100)
+            with c_img: st.image(img, width=100)
             with c_del:
                 st.write(f"No.{i+1}")
-                # 個別削除ボタン
                 if st.button(f"🗑️ No.{i+1} を削除（とりなおす）", key=f"del_{i}"):
                     del st.session_state.captured_images[i]
                     st.rerun()
@@ -264,13 +279,11 @@ elif input_method == "📷 その場で撮影":
         if st.button("🗑️ 全て削除して最初から"):
             st.session_state.captured_images = []
             st.rerun()
-            
         final_image_list.extend(st.session_state.captured_images)
 
 elif input_method == "🌐 URL入力":
     target_url = st.text_input("URL", placeholder="https://...")
 
-# 画像確認（アルバムからの場合のみここで表示。カメラは上で表示済み）
 if input_method == "📂 アルバムから" and final_image_list:
     st.markdown("###### ▼ 画像確認")
     cols = st.columns(len(final_image_list))
@@ -291,7 +304,7 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
     if os.path.exists(output_dir): shutil.rmtree(output_dir)
     os.makedirs(output_dir)
 
-    with st.spinner('解析中...'):
+    with st.spinner('AIが解析中...'):
         try:
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(target_model_name)
@@ -314,14 +327,15 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
                 parts.append(prompt + f"\n\n{web_text[:30000]}")
 
             resp = None
+            # リトライ待機時間を少し長めに（安全策）
             for _ in range(3):
                 try: resp = model.generate_content(parts); break
-                except exceptions.ResourceExhausted: time.sleep(5)
+                except exceptions.ResourceExhausted: time.sleep(10) # 429エラー時は10秒待つ
                 except: pass
 
-            if not resp: st.error("失敗しました"); st.stop()
+            if not resp: st.error("失敗しました（アクセス集中）。少し待ってから再試行してください。"); st.stop()
 
-            text_resp = response.text
+            text_resp = response.text if response else resp.text
             start = text_resp.find('[')
             end = text_resp.rfind(']') + 1
             if start == -1: st.error("解析エラー"); st.stop()
@@ -335,8 +349,9 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
             menu_data.insert(0, {"title": "はじめに・目次", "text": intro_t})
 
             progress_bar = st.progress(0)
-            st.info("音声を生成しています... (並列処理中)")
-            generated_tracks = asyncio.run(process_all_tracks_parallel(menu_data, output_dir, voice_code, rate_value, progress_bar))
+            st.info("音声を生成しています... (安定モード動作中)")
+            # ★安全版の並列処理（同時2つまで）★
+            generated_tracks = asyncio.run(process_all_tracks_safe(menu_data, output_dir, voice_code, rate_value, progress_bar))
 
             html_str = create_standalone_html_player(store_name, generated_tracks)
             d_str = datetime.now().strftime('%Y%m%d')
@@ -362,12 +377,15 @@ if st.session_state.generated_result:
     st.subheader("▶️ プレビュー (その場で確認)")
     render_preview_player(res["tracks"])
     st.divider()
-    st.subheader("📥 保存")
+    st.subheader("📥 共有・保存")
+    
+    st.markdown("**📱 1. プレイヤーを直接送る (LINEなど)**")
+    render_share_button(res['html_content'], res['html_name'])
+    
+    st.write("")
+    st.markdown("**📥 2. ファイルとして保存**")
     c_w, c_z = st.columns(2)
     with c_w:
-        st.markdown("**📱 Webプレイヤー (スマホ推奨)**")
-        st.download_button(f"🌐 {res['html_name']} を保存", res['html_content'], res['html_name'], "text/html", type="primary")
+        st.download_button(f"🌐 Webプレイヤー ({res['html_name']})", res['html_content'], res['html_name'], "text/html")
     with c_z:
-        st.markdown("**🗂 ZIPファイル (PC用)**")
-        with open(res["zip_path"], "rb") as f:
-            st.download_button(f"📦 {res['zip_name']} を保存", f, res['zip_name'], "application/zip")
+        st.download_button(f"📦 ZIPファイル ({res['zip_name']})", open(res["zip_path"], "rb"), res['zip_name'], "application/zip")
