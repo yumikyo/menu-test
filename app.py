@@ -16,7 +16,6 @@ import requests
 from bs4 import BeautifulSoup
 import edge_tts
 import streamlit.components.v1 as components
-from PIL import Image
 
 # 非同期処理の適用
 nest_asyncio.apply()
@@ -29,6 +28,7 @@ st.set_page_config(page_title="Menu Player Generator", layout="wide")
 # ==========================================
 
 def sanitize_filename(name):
+    # ファイル名に使えない文字を除去
     return re.sub(r'[\\/*?:"<>|]', "", name).replace(" ", "_").replace("　", "_")
 
 def fetch_text_from_url(url):
@@ -71,8 +71,8 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     track_info_list = []
 
     for i, track in enumerate(menu_data):
-        safe_title = sanitize_filename(track['title'])
-        filename = f"{i+1:02}_{safe_title}.mp3"
+        # 【修正】日本語ファイル名はエラーの原因になるため、強制的に安全な英語名(track_01.mp3)にする
+        filename = f"track_{i+1:02}.mp3"
         save_path = os.path.join(output_dir, filename)
         
         speech_text = track['text']
@@ -92,7 +92,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     
     return track_info_list
 
-# HTML生成関数（安全な .replace 方式）
+# HTML生成関数
 def create_standalone_html_player(store_name, menu_data):
     playlist_js = []
     for track in menu_data:
@@ -209,8 +209,17 @@ if 'show_camera' not in st.session_state: st.session_state.show_camera = False
 # Step 1
 st.markdown("### 1. お店情報の入力")
 c1, c2 = st.columns(2)
-with c1: store_name = st.text_input("🏠 店舗名（必須）", placeholder="例：カフェタナカ")
-with c2: menu_title = st.text_input("📖 今回のメニュー名", placeholder="例：ランチ")
+with c1:
+    store_name = st.text_input("🏠 店舗名（表示用・日本語可）", placeholder="例：カフェタナカ")
+    # 【変更】ファイル名用のID入力欄を追加
+    store_id = st.text_input("📁 ファイル名用（英数字）", placeholder="例：cafe_tanaka")
+    if store_id:
+        store_id = sanitize_filename(store_id)
+    else:
+        store_id = "menu"
+with c2:
+    menu_title = st.text_input("📖 今回のメニュー名", placeholder="例：ランチ")
+
 st.markdown("---")
 
 # Step 2
@@ -230,11 +239,7 @@ elif input_method == "📷 その場で撮影":
             st.session_state.show_camera = True
             st.rerun()
     else:
-        st.info("""
-        ⚠️ **カメラの使い方のヒント**
-        * **インカメラになる場合**: カメラ画面内の「Select Device」や「回転マーク」で切り替えてください。
-        * **ボタンの意味**: 「Take Photo」＝ 撮影、「Clear Photo」＝ 撮り直し
-        """)
+        st.info("スマホを横向きにすると広く撮れます")
         camera_file = st.camera_input("📸 撮影（Take Photoを押してください）", key=f"camera_{st.session_state.camera_key}")
         if camera_file:
             if st.button("⬇️ この写真を追加して次を撮る", type="primary"):
@@ -253,11 +258,11 @@ elif input_method == "📷 その場で撮影":
             with c_img: st.image(img, width=100)
             with c_del:
                 st.write(f"No.{i+1}")
-                if st.button(f"🗑️ No.{i+1} を削除（とりなおす）", key=f"del_{i}"):
+                if st.button(f"🗑️ No.{i+1} を削除", key=f"del_{i}"):
                     del st.session_state.captured_images[i]
                     st.rerun()
         st.divider()
-        if st.button("🗑️ 全て削除して最初から"):
+        if st.button("🗑️ 全て削除"):
             st.session_state.captured_images = []
             st.rerun()
         final_image_list.extend(st.session_state.captured_images)
@@ -265,7 +270,6 @@ elif input_method == "📷 その場で撮影":
 elif input_method == "🌐 URL入力":
     target_url = st.text_input("URL", placeholder="https://...")
 
-# 画像確認エリア（枚数制限を解除し、5枚ごとに折り返し表示）
 if input_method == "📂 アルバムから" and final_image_list:
     st.markdown("###### ▼ 画像確認")
     cols_per_row = 5
@@ -349,9 +353,11 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
 
             html_str = create_standalone_html_player(store_name, generated_tracks)
             d_str = datetime.now().strftime('%Y%m%d')
-            s_name = sanitize_filename(store_name)
-            zip_name = f"{s_name}_{d_str}.zip"
+            
+            # ZIPファイル名だけは英語（store_id）を使う
+            zip_name = f"{store_id}_{d_str}.zip"
             zip_path = os.path.abspath(zip_name)
+            
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z:
                 for root, dirs, files in os.walk(output_dir):
                     for file in files: z.write(os.path.join(root, file), file)
@@ -363,7 +369,7 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
                 "zip_data": zip_data,
                 "zip_name": zip_name,
                 "html_content": html_str, 
-                "html_name": f"{s_name}_player.html",
+                "html_name": f"{store_id}_player.html",
                 "tracks": generated_tracks
             }
             st.balloons()
@@ -380,15 +386,8 @@ if st.session_state.generated_result:
     
     st.info("""
     **📱 LINEなどで送る方法（重要）**
-    LINEなどのアプリはセキュリティ制限により、ここから直接送ることはできません。以下の手順で行ってください。
-    
-    1. 下の **「🌐 Webプレイヤーをダウンロード」** ボタンを押して、スマホに保存する。
-    2. スマホの「ファイル」アプリ（iPhoneなら"ファイル"、Androidなら"Files"）を開く。
-    3. ダウンロードしたファイルを長押しして「共有」を選び、LINEなどを選択する。
-
-    **📦 ZIPファイルの使い方**
-    * パソコンにデータをバックアップ保存する場合に使います。
-    * **本棚アプリ「My Menu Book」**（現在開発中）にこのメニューを追加する際に使用します。
+    1. 下の **「🌐 Webプレイヤー」** ボタンでHTMLを保存し、スマホに送る。
+    2. もしくは **「📦 ZIPファイル」** を保存して、My Menu Book アプリに登録する。
     """)
     
     c_w, c_z = st.columns(2)
