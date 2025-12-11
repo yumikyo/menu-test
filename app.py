@@ -75,6 +75,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         save_path = os.path.join(output_dir, filename)
         
         speech_text = track['text']
+        # 読み上げ時に「1、〇〇」と言わせる処理
         if i > 0: speech_text = f"{i+1}、{track['title']}。\n{track['text']}"
         
         tasks.append(generate_single_track_fast(speech_text, save_path, voice_code, rate_value))
@@ -90,7 +91,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     
     return track_info_list
 
-# 【修正版】HTML生成関数（f-stringを使わず .replace で置換することでエラーを回避）
+# HTML生成関数（安全な .replace 方式）
 def create_standalone_html_player(store_name, menu_data):
     playlist_js = []
     for track in menu_data:
@@ -105,7 +106,6 @@ def create_standalone_html_player(store_name, menu_data):
     
     playlist_json_str = json.dumps(playlist_js, ensure_ascii=False)
     
-    # CSSやJSの波括弧 { } がPythonと干渉しないように、通常の文字列として定義
     html_template = """<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__STORE_NAME__</title>
 <style>body{font-family:sans-serif;background:#f4f4f4;margin:0;padding:20px;}.c{max-width:600px;margin:0 auto;background:#fff;padding:20px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
@@ -128,10 +128,9 @@ au.onended=function(){if(idx<pl.length-1)next();else pb.innerText="▶";};
 function ren(){const d=document.getElementById('ls');d.innerHTML="";pl.forEach((t,i)=>{const m=document.createElement('div');m.className="itm "+(i===idx?"active":"");m.innerText=(i+1)+". "+t.title;m.onclick=()=>{ld(i);au.play();pb.innerText="⏸";};d.appendChild(m);});}
 init();</script></body></html>"""
 
-    # ここで安全に置換する
     return html_template.replace("__STORE_NAME__", store_name).replace("__PLAYLIST_JSON__", playlist_json_str)
 
-# 【修正版】プレビュー表示関数
+# プレビュー表示関数
 def render_preview_player(tracks):
     playlist_data = []
     for track in tracks:
@@ -168,7 +167,7 @@ def render_preview_player(tracks):
     html_code = html_template.replace("__PLAYLIST__", playlist_json)
     components.html(html_code, height=400)
 
-# 【修正版】シェアボタン関数
+# シェアボタン関数
 def render_share_button(html_content, file_name):
     b64_html = base64.b64encode(html_content.encode('utf-8')).decode('utf-8')
     html_template = """
@@ -304,11 +303,25 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
             model = genai.GenerativeModel(target_model_name)
             parts = []
             
+            # ----------------------------------------------------------------
+            # 【ここを修正】カテゴリーをまとめるためのプロンプトを強化
+            # ----------------------------------------------------------------
             prompt = """
             あなたは視覚障害者のためのメニュー読み上げデータ作成のプロです。
-            以下のJSON形式のみ出力。Markdown不要。接続詞・挨拶削除。商品名と価格のみ。
-            [{"title": "前菜", "text": "シーザーサラダ、800円。"}]
+            メニューの内容を解析し、聞きやすいように【5つ〜8つ程度の大きなカテゴリー】に分類してまとめてください。
+            
+            重要ルール:
+            1. メニュー項目1つごとに1つのカテゴリーを作らないこと。
+            2. 「前菜・サラダ」「メイン料理」「ご飯・麺」「ドリンク」「デザート」のようにグループ化する。
+            3. カテゴリー内のメニューは、挨拶などを抜きにして商品名と価格をテンポよく読み上げる文章にする。
+
+            出力フォーマット（JSONのみ）:
+            [
+              {"title": "カテゴリー名（例：前菜・サラダ）", "text": "読み上げ文（例：まずは前菜です。シーザーサラダ800円。ポテトサラダ500円。）"},
+              {"title": "カテゴリー名（例：メイン料理）", "text": "読み上げ文（例：続いてメインです。ハンバーグ定食1200円。ステーキ1500円。）"}
+            ]
             """
+            # ----------------------------------------------------------------
             
             if final_image_list:
                 parts.append(prompt)
@@ -328,7 +341,6 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
 
             if not resp: st.error("失敗しました"); st.stop()
 
-            # 変数を resp に統一
             text_resp = resp.text
             
             start = text_resp.find('[')
