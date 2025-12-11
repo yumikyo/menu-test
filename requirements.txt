@@ -1,5 +1,7 @@
 streamlit
 google-generativeai>=0.8.3
 edge-tts
-nest_asyncio
 gTTS
+beautifulsoup4
+requests
+nest_asyncio
