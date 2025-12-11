@@ -78,7 +78,8 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         progress_bar.progress(completed / total)
     return track_info_list
 
-def create_standalone_html_player(store_name, menu_data):
+# HTMLプレイヤー生成（地図ボタン対応版）
+def create_standalone_html_player(store_name, menu_data, map_url=""):
     playlist_js = []
     for track in menu_data:
         file_path = track['path']
@@ -88,6 +89,15 @@ def create_standalone_html_player(store_name, menu_data):
                 playlist_js.append({"title": track['title'], "src": f"data:audio/mp3;base64,{b64_data}"})
     playlist_json_str = json.dumps(playlist_js, ensure_ascii=False)
     
+    # 地図ボタンのHTMLを作成（URLがある場合のみ）
+    map_button_html = ""
+    if map_url:
+        map_button_html = f"""
+        <a href="{map_url}" target="_blank" style="text-decoration:none;">
+            <button style="background-color:#4285F4; margin-bottom:10px;">🗺️ 地図・アクセス (Google Map)</button>
+        </a>
+        """
+
     html_template = """<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__STORE_NAME__</title>
 <style>body{font-family:sans-serif;background:#f4f4f4;margin:0;padding:20px;}.c{max-width:600px;margin:0 auto;background:#fff;padding:20px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
@@ -95,7 +105,9 @@ h1{text-align:center;font-size:1.5em;color:#333;}.box{background:#fff5f5;border:
 .ti{font-size:1.3em;font-weight:bold;color:#ff4b4b;}.ctrl{display:flex;gap:10px;margin:15px 0;}
 button{flex:1;padding:15px;font-size:1.2em;font-weight:bold;color:#fff;background:#ff4b4b;border:none;border-radius:10px;cursor:pointer;}
 .lst{border-top:1px solid #eee;padding-top:10px;}.itm{padding:12px;border-bottom:1px solid #eee;cursor:pointer;}.itm.active{background:#ffecec;color:#ff4b4b;font-weight:bold;}</style></head>
-<body><div class="c"><h1>🎧 __STORE_NAME__</h1><div class="box"><div class="ti" id="ti">Loading...</div></div><audio id="au" style="width:100%"></audio>
+<body><div class="c"><h1>🎧 __STORE_NAME__</h1>
+<div style="text-align:center;">__MAP_BUTTON__</div>
+<div class="box"><div class="ti" id="ti">Loading...</div></div><audio id="au" style="width:100%"></audio>
 <div class="ctrl"><button onclick="prev()">⏮</button><button onclick="toggle()" id="pb">▶</button><button onclick="next()">⏭</button></div>
 <div style="text-align:center;margin-bottom:15px;">速度: <select id="sp" onchange="csp()"><option value="1.0">1.0</option><option value="1.4" selected>1.4</option><option value="2.0">2.0</option></select></div>
 <div id="ls" class="lst"></div></div>
@@ -109,7 +121,13 @@ function csp(){au.playbackRate=parseFloat(document.getElementById('sp').value);}
 au.onended=function(){if(idx<pl.length-1)next();else pb.innerText="▶";};
 function ren(){const d=document.getElementById('ls');d.innerHTML="";pl.forEach((t,i)=>{const m=document.createElement('div');m.className="itm "+(i===idx?"active":"");m.innerText=(i+1)+". "+t.title;m.onclick=()=>{ld(i);au.play();pb.innerText="⏸";};d.appendChild(m);});}
 init();</script></body></html>"""
-    return html_template.replace("__STORE_NAME__", store_name).replace("__PLAYLIST_JSON__", playlist_json_str)
+    
+    # テンプレート内の文字を置換
+    final_html = html_template.replace("__STORE_NAME__", store_name)
+    final_html = final_html.replace("__PLAYLIST_JSON__", playlist_json_str)
+    final_html = final_html.replace("__MAP_BUTTON__", map_button_html)
+    
+    return final_html
 
 def render_preview_player(tracks):
     playlist_data = []
@@ -180,10 +198,17 @@ if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
 if 'generated_result' not in st.session_state: st.session_state.generated_result = None
 if 'show_camera' not in st.session_state: st.session_state.show_camera = False
 
+# Step 1
 st.markdown("### 1. お店情報の入力")
 c1, c2 = st.columns(2)
 with c1: store_name = st.text_input("🏠 店舗名（必須）", placeholder="例：カフェタナカ")
 with c2: menu_title = st.text_input("📖 今回のメニュー名", placeholder="例：ランチ")
+
+# 地図URL入力欄を追加
+map_url = st.text_input("📍 GoogleマップのURL（任意）", placeholder="例：https://maps.app.goo.gl/...")
+if map_url:
+    st.caption("※プレイヤーに地図ボタンが表示されるようになります。")
+
 st.markdown("---")
 
 st.markdown("### 2. メニューの登録")
@@ -297,7 +322,9 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
             st.info("音声を生成しています... (並列処理中)")
             generated_tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value, progress_bar))
 
-            html_str = create_standalone_html_player(store_name, generated_tracks)
+            # HTML作成時に map_url を渡す
+            html_str = create_standalone_html_player(store_name, generated_tracks, map_url)
+            
             d_str = datetime.now().strftime('%Y%m%d')
             s_name = sanitize_filename(store_name)
             zip_name = f"{s_name}_{d_str}.zip"
@@ -322,11 +349,11 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
 if st.session_state.generated_result:
     res = st.session_state.generated_result
     st.divider()
-    st.subheader("▶️ プレビュー (その場で確認)")
+    st.subheader("▶️ プレビュー")
     render_preview_player(res["tracks"])
     st.divider()
     st.subheader("📥 保存")
-    st.info("「Webプレイヤー」はスマホで聞く用、「ZIPファイル」は本棚アプリ用です。")
+    st.info("「Webプレイヤー」は地図ボタン付きです。")
     c1, c2 = st.columns(2)
     with c1: st.download_button(f"🌐 Webプレイヤー ({res['html_name']})", res['html_content'], res['html_name'], "text/html", type="primary")
     with c2: st.download_button(f"📦 ZIPファイル ({res['zip_name']})", data=res["zip_data"], file_name=res['zip_name'], mime="application/zip")
