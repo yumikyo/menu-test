@@ -22,12 +22,12 @@ nest_asyncio.apply()
 st.set_page_config(page_title="Menu Player", layout="wide")
 
 # ==========================================
-# 2. サイドバー設定（自動ログイン機能付き）
+# 2. サイドバー設定
 # ==========================================
 with st.sidebar:
     st.header("🔧 設定")
     
-    # 【変更点】Secrets(金庫)にキーがあれば勝手に使う
+    # Secrets(金庫)のキー確認
     if "GEMINI_API_KEY" in st.secrets:
         api_key = st.secrets["GEMINI_API_KEY"]
         st.success("🔑 APIキー認証済み")
@@ -47,16 +47,30 @@ with st.sidebar:
             pass
     
     if valid_models:
-        # Flash系を優先的に選択
         default_idx = next((i for i, n in enumerate(valid_models) if "flash" in n), 0)
         target_model_name = st.selectbox("使用するAIモデル", valid_models, index=default_idx)
     elif api_key:
         st.error("有効なモデルが見つかりません")
 
     st.divider()
+    
+    # 🗣️ 音声の設定（ここにスピード調整を追加）
+    st.subheader("🗣️ 音声設定")
+    
     voice_options = {"女性（七海）": "ja-JP-NanamiNeural", "男性（慶太）": "ja-JP-KeitaNeural"}
-    selected_voice = st.selectbox("音声の声 (メイン)", list(voice_options.keys()))
+    selected_voice = st.selectbox("声の種類", list(voice_options.keys()))
     voice_code = voice_options[selected_voice]
+    
+    # スピード選択（デフォルトを1.4倍に設定）
+    speed_options = {
+        "標準 (±0%)": "+0%", 
+        "少し速く (1.2倍)": "+20%", 
+        "サクサク (1.4倍/推奨)": "+40%", 
+        "爆速 (2.0倍)": "+100%"
+    }
+    # デフォルトで「サクサク (1.4倍)」が選ばれるように index=2 を指定
+    selected_speed_label = st.selectbox("読み上げ速度", list(speed_options.keys()), index=2)
+    rate_value = speed_options[selected_speed_label]
 
 # ==========================================
 # 3. メイン画面
@@ -77,12 +91,16 @@ if uploaded_files:
 # ==========================================
 # 4. 音声生成ロジック
 # ==========================================
-async def generate_audio_safe(text, filename, voice_code):
+async def generate_audio_safe(text, filename, voice_code, rate_value):
     try:
-        comm = edge_tts.Communicate(text, voice_code)
+        # メイン音声（EdgeTTS）に速度(rate)を適用
+        comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
         await comm.save(filename)
         return "EdgeTTS"
     except Exception as e:
+        # 予備音声（GoogleTTS）は速度調整が難しいため標準速度のまま
+        # ※あくまで緊急用のため
+        print(f"Fallback to gTTS: {e}")
         tts = gTTS(text=text, lang='ja')
         tts.save(filename)
         return "GoogleTTS"
@@ -91,7 +109,7 @@ if st.button("🎙️ 音声メニューを作成する"):
     if not api_key or not target_model_name:
         st.error("設定を確認してください（APIキーまたはモデル）")
     else:
-        with st.spinner('AIがメニューを読んでいます...そのままお待ちください'):
+        with st.spinner('AIがメニューを読んでいます...'):
             try:
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel(target_model_name)
@@ -121,9 +139,15 @@ if st.button("🎙️ 音声メニューを作成する"):
                     st.subheader(f"🎵 {track['title']}")
                     st.write(track['text'])
                     fname = f"track_{i+1}.mp3"
-                    asyncio.run(generate_audio_safe(track['text'], fname, voice_code))
+                    
+                    # 速度パラメータを渡して生成
+                    method = asyncio.run(generate_audio_safe(track['text'], fname, voice_code, rate_value))
+                    
                     st.audio(fname)
+                    if method == "GoogleTTS":
+                        st.caption("※通信混雑のため、予備音声（標準速度）で再生します")
 
             except Exception as e:
                 st.error("エラーが発生しました")
                 st.write(f"詳細: {e}")
+            
