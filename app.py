@@ -7,6 +7,7 @@ import json
 import nest_asyncio
 import time
 import shutil
+import zipfile
 from gtts import gTTS
 
 # ==========================================
@@ -88,14 +89,18 @@ if uploaded_files:
 # 4. 音声生成ロジック
 # ==========================================
 async def generate_audio_safe(text, filename, voice_code, rate_value):
+    # 3回リトライ
     for attempt in range(3):
         try:
             comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
             await comm.save(filename)
-            return "EdgeTTS"
+            # ファイルが空でないか確認
+            if os.path.exists(filename) and os.path.getsize(filename) > 0:
+                return "EdgeTTS"
         except Exception as e:
-            time.sleep(2)
+            time.sleep(1)
             
+    # 予備音声
     try:
         tts = gTTS(text=text, lang='ja')
         tts.save(filename)
@@ -107,13 +112,13 @@ if st.button("🎙️ 音声メニューを作成する"):
     if not api_key or not target_model_name:
         st.error("設定を確認してください（APIキーまたはモデル）")
     else:
-        # 保存用の一時フォルダを作成
-        output_dir = "menu_audio_album"
+        # フォルダのリセット
+        output_dir = os.path.abspath("menu_audio_album")
         if os.path.exists(output_dir):
             shutil.rmtree(output_dir)
         os.makedirs(output_dir)
 
-        with st.spinner('AIがメニューを読んでいます...（完了後にダウンロードボタンが出ます）'):
+        with st.spinner('AIがメニューを読んでいます...'):
             try:
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel(target_model_name)
@@ -126,8 +131,6 @@ if st.button("🎙️ 音声メニューを作成する"):
                 Markdown記法は不要です。
                 [{"title": "はじめに", "text": "..."}] 
                 """
-                # ↑タイトルに「トラック1」と入れなくてOK（後で自動で番号を振ります）
-                
                 content_parts.append(prompt)
                 for f in uploaded_files:
                     content_parts.append({"mime_type": f.type, "data": f.getvalue()})
@@ -143,10 +146,10 @@ if st.button("🎙️ 音声メニューを作成する"):
                 
                 progress_bar = st.progress(0)
                 
+                # 音声生成ループ
                 for i, track in enumerate(menu_data):
-                    # ファイル名を "01_はじめに.mp3" のように整形して、並び順を保証する
-                    track_number = f"{i+1:02}" # 01, 02...
-                    safe_title = track['title'].replace("/", "_").replace(" ", "_") # ファイル名に使えない文字を消す
+                    track_number = f"{i+1:02}"
+                    safe_title = track['title'].replace("/", "_").replace(" ", "_")
                     filename = f"{track_number}_{safe_title}.mp3"
                     save_path = os.path.join(output_dir, filename)
                     
@@ -155,25 +158,40 @@ if st.button("🎙️ 音声メニューを作成する"):
                     
                     method = asyncio.run(generate_audio_safe(track['text'], save_path, voice_code, rate_value))
                     
-                    st.audio(save_path)
+                    if os.path.exists(save_path) and os.path.getsize(save_path) > 0:
+                        st.audio(save_path)
+                    else:
+                        st.error("音声ファイルの生成に失敗しました")
                     
-                    time.sleep(1)
                     progress_bar.progress((i + 1) / len(menu_data))
+                    time.sleep(0.5)
 
                 # ==========================================
-                # ZIPファイルの作成とダウンロードボタン
+                # ZIPファイルの作成（強化版）
                 # ==========================================
-                shutil.make_archive("menu_album", 'zip', output_dir)
+                zip_filename = "menu_audio_album.zip"
+                # 確実に新しいZIPを作る
+                with zipfile.ZipFile(zip_filename, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(output_dir):
+                        for file in files:
+                            # フォルダ構造を含めず、ファイルだけをフラットに入れる
+                            zipf.write(os.path.join(root, file), file)
                 
-                with open("menu_album.zip", "rb") as fp:
-                    st.download_button(
-                        label="📥 アルバムをまとめてダウンロード (ZIP)",
-                        data=fp,
-                        file_name="menu_audio_album.zip",
-                        mime="application/zip"
-                    )
+                # サイズ確認
+                zip_size_mb = os.path.getsize(zip_filename) / (1024 * 1024)
                 
-                st.info("👆 このボタンを押してZIPファイルをダウンロードし、スマホなどで解凍すると、CDのように連続再生できます。")
+                if zip_size_mb < 0.01: # 小さすぎる場合は警告
+                    st.error(f"⚠️ エラー: ZIPファイルの作成に失敗した可能性があります（サイズ: {os.path.getsize(zip_filename)} bytes）。")
+                else:
+                    st.success(f"📦 ZIP作成完了（サイズ: {zip_size_mb:.2f} MB）")
+                    
+                    with open(zip_filename, "rb") as fp:
+                        st.download_button(
+                            label="📥 アルバムをまとめてダウンロード (ZIP)",
+                            data=fp,
+                            file_name="menu_audio_album.zip",
+                            mime="application/zip"
+                        )
 
             except Exception as e:
                 st.error("エラーが発生しました")
