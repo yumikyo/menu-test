@@ -98,6 +98,7 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
         </a>
         """
 
+    # 【修正】デフォルト速度を1.0に変更 (<option value="1.0" selected>1.0</option>)
     html_template = """<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__STORE_NAME__</title>
 <style>body{font-family:sans-serif;background:#f4f4f4;margin:0;padding:20px;}.c{max-width:600px;margin:0 auto;background:#fff;padding:20px;border-radius:15px;box-shadow:0 2px 10px rgba(0,0,0,0.1);}
@@ -109,7 +110,7 @@ button{flex:1;padding:15px;font-size:1.2em;font-weight:bold;color:#fff;backgroun
 <div style="text-align:center;">__MAP_BUTTON__</div>
 <div class="box"><div class="ti" id="ti">Loading...</div></div><audio id="au" style="width:100%"></audio>
 <div class="ctrl"><button onclick="prev()">⏮</button><button onclick="toggle()" id="pb">▶</button><button onclick="next()">⏭</button></div>
-<div style="text-align:center;margin-bottom:15px;">速度: <select id="sp" onchange="csp()"><option value="1.0">1.0</option><option value="1.4" selected>1.4</option><option value="2.0">2.0</option></select></div>
+<div style="text-align:center;margin-bottom:15px;">速度: <select id="sp" onchange="csp()"><option value="0.8">0.8</option><option value="1.0" selected>1.0</option><option value="1.2">1.2</option><option value="1.5">1.5</option></select></div>
 <div id="ls" class="lst"></div></div>
 <script>const pl=__PLAYLIST_JSON__;let idx=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');
 function init(){ren();ld(0);csp();}
@@ -138,6 +139,7 @@ def render_preview_player(tracks):
                 playlist_data.append({"title": track['title'],"src": f"data:audio/mp3;base64,{b64}"})
     playlist_json = json.dumps(playlist_data)
     
+    # 【修正】デフォルト速度を1.0に変更
     html_template = """<!DOCTYPE html><html><head><style>
     body{margin:0;padding:0;font-family:sans-serif;}
     .p-box{border:2px solid #e0e0e0;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}
@@ -148,7 +150,7 @@ def render_preview_player(tracks):
     .it{padding:6px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}.it.active{color:#ff4b4b;font-weight:bold;background:#ffecec;}
     </style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio>
     <div class="ctrls"><button onclick="pv()">⏮</button><button onclick="tg()" id="pb">▶</button><button onclick="nx()">⏭</button></div>
-    <div style="font-size:12px;color:#666;">速度:<select id="sp" onchange="sp()"><option value="1.0">1.0</option><option value="1.4" selected>1.4</option><option value="2.0">2.0</option></select></div>
+    <div style="font-size:12px;color:#666;">速度:<select id="sp" onchange="sp()"><option value="0.8">0.8</option><option value="1.0" selected>1.0</option><option value="1.2">1.2</option><option value="1.5">1.5</option></select></div>
     <div id="ls" class="lst"></div></div>
     <script>
     const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');
@@ -353,7 +355,15 @@ if st.session_state.generated_result:
     render_preview_player(res["tracks"])
     st.divider()
     st.subheader("📥 保存")
-    st.info("「Webプレイヤー」は地図ボタン付きです。")
+    
+    # 【修正】保存形式の説明を分かりやすく記述
+    st.info(
+        """
+        **Webプレイヤー**：スマホへの保存やLINE共有に便利です。（地図ボタン付き）  
+        **ZIPファイル**：PCでの保存や、My Menu Bookへの追加にご利用ください。
+        """
+    )
+    
     c1, c2 = st.columns(2)
     with c1: st.download_button(f"🌐 Webプレイヤー ({res['html_name']})", res['html_content'], res['html_name'], "text/html", type="primary")
     with c2: st.download_button(f"📦 ZIPファイル ({res['zip_name']})", data=res["zip_data"], file_name=res['zip_name'], mime="application/zip")
