@@ -108,8 +108,22 @@ h1{text-align:center;font-size:1.5em;color:#333;margin-bottom:10px;}
 h2{font-size:1.2em;color:#555;margin-top:20px;margin-bottom:10px;border-bottom:2px solid #eee;padding-bottom:5px;}
 .box{background:#fff5f5;border:2px solid #ff4b4b;border-radius:10px;padding:15px;text-align:center;margin-bottom:20px;}
 .ti{font-size:1.3em;font-weight:bold;color:#b71c1c;}
+/* コントロール部分のデザイン修正 */
 .ctrl{display:flex;gap:15px;margin:20px 0;justify-content:center;}
-button{flex:1;padding:15px;font-size:1.4em;font-weight:bold;color:#fff;background:#ff4b4b;border:none;border-radius:10px;cursor:pointer;min-height:55px;min-width:55px; transition:background 0.2s;}
+button{
+    flex:1;
+    padding:15px 0;
+    font-size:1.8em; /* アイコンサイズアップ */
+    font-weight:bold;
+    color:#fff;
+    background:#ff4b4b; /* My Menu Bookの赤色 */
+    border:none;
+    border-radius:8px; /* 角丸調整 */
+    cursor:pointer;
+    min-height:60px;
+    display:flex; justify-content:center; align-items:center;
+    transition:background 0.2s;
+}
 button:hover{background:#e04141;}
 button:focus, .map-btn:focus, select:focus, .itm:focus{outline:3px solid #333; outline-offset: 2px;}
 .map-btn{display:inline-block; padding:12px 20px; background-color:#4285F4; color:white; text-decoration:none; border-radius:8px; font-weight:bold; box-shadow:0 2px 5px rgba(0,0,0,0.2);}
@@ -117,7 +131,6 @@ button:focus, .map-btn:focus, select:focus, .itm:focus{outline:3px solid #333; o
 .itm{padding:15px;border-bottom:1px solid #eee;cursor:pointer; font-size:1.1em;}
 .itm:hover{background:#f9f9f9;}
 .itm.active{background:#ffecec;color:#b71c1c;font-weight:bold;border-left:5px solid #ff4b4b;}
-.sr-only {position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
 </style></head>
 <body>
 <main class="c" role="main">
@@ -211,7 +224,7 @@ init();
     final_html = final_html.replace("__MAP_BUTTON__", map_button_html)
     return final_html
 
-# プレビュー用プレイヤー
+# プレビュー用プレイヤー（デザイン更新版）
 def render_preview_player(tracks):
     playlist_data = []
     for track in tracks:
@@ -220,13 +233,30 @@ def render_preview_player(tracks):
                 b64 = base64.b64encode(f.read()).decode()
                 playlist_data.append({"title": track['title'],"src": f"data:audio/mp3;base64,{b64}"})
     playlist_json = json.dumps(playlist_data)
+    
+    # HTMLテンプレート（My Menu Book風のデザインに調整）
     html_template = """<!DOCTYPE html><html><head><style>
     body{margin:0;padding:0;font-family:sans-serif;}
     .p-box{border:2px solid #e0e0e0;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}
     .t-ti{font-size:18px;font-weight:bold;color:#333;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #ff4b4b;}
-    .ctrls{display:flex;gap:5px;margin:10px 0;}
-    button{flex:1;padding:10px;font-weight:bold;color:#fff;background:#ff4b4b;border:none;border-radius:5px;cursor:pointer; min-height:44px;}
-    button:focus{outline:3px solid #333;}
+    
+    /* My Menu Book風のボタンスタイル */
+    .ctrls{display:flex; gap:10px; margin:15px 0;}
+    button {
+        flex: 1;
+        background-color: #ff4b4b; /* 赤色 */
+        color: white; /* 白文字 */
+        border: none;
+        border-radius: 8px; /* 角丸 */
+        font-size: 24px; /* アイコンを大きく */
+        padding: 10px 0;
+        cursor: pointer;
+        line-height: 1;
+        min-height: 50px;
+    }
+    button:hover { background-color: #e04141; }
+    button:focus { outline: 3px solid #333; outline-offset: 2px; }
+
     .lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}
     .it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}
     .it:focus{outline:2px solid #333; background:#eee;}
@@ -293,7 +323,7 @@ with st.sidebar:
 st.title("🎧 Menu Player Generator")
 st.caption("視覚障がいのある方のための、アクセシビリティに配慮した音声メニューを作成します。")
 
-# 【追加】再撮影する画像のインデックスを保持するstate
+# 再撮影する画像のインデックスを保持するstate
 if 'retake_index' not in st.session_state: st.session_state.retake_index = None
 if 'captured_images' not in st.session_state: st.session_state.captured_images = []
 if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
@@ -323,7 +353,7 @@ if input_method == "📂 アルバムから":
     if uploaded_files: final_image_list.extend(uploaded_files)
 
 elif input_method == "📷 その場で撮影":
-    # --- 【修正】再撮影モードの処理 ---
+    # --- 再撮影モードの処理 ---
     if st.session_state.retake_index is not None:
         target_idx = st.session_state.retake_index
         st.warning(f"No.{target_idx + 1} の画像を再撮影中...")
@@ -336,12 +366,10 @@ elif input_method == "📷 その場で撮影":
         with c1:
             if camera_file:
                 if st.button("✅ これで決定", type="primary", key="retake_confirm"):
-                    # リストの指定位置を上書き
                     st.session_state.captured_images[target_idx] = camera_file
-                    # 状態をリセット
                     st.session_state.retake_index = None
                     st.session_state.show_camera = False 
-                    st.session_state.camera_key += 1 # キーを更新してキャッシュクリア
+                    st.session_state.camera_key += 1
                     st.rerun()
         with c2:
             if st.button("❌ キャンセル", key="retake_cancel"):
@@ -349,13 +377,12 @@ elif input_method == "📷 その場で撮影":
                 st.session_state.show_camera = False
                 st.rerun()
 
-    # --- 通常撮影モード（カメラ未起動） ---
+    # --- 通常撮影モード ---
     elif not st.session_state.show_camera:
         if st.button("📷 カメラ起動", type="primary"):
             st.session_state.show_camera = True
             st.rerun()
             
-    # --- 通常撮影モード（カメラ起動中） ---
     else:
         camera_file = st.camera_input("撮影", key=f"camera_{st.session_state.camera_key}")
         if camera_file:
@@ -367,7 +394,6 @@ elif input_method == "📷 その場で撮影":
             st.session_state.show_camera = False
             st.rerun()
             
-    # 撮影済みリストへの追加
     if st.session_state.captured_images:
         if st.session_state.retake_index is None and st.session_state.show_camera is False:
              if st.button("🗑️ 全て削除"):
@@ -378,7 +404,7 @@ elif input_method == "📷 その場で撮影":
 elif input_method == "🌐 URL入力":
     target_url = st.text_input("URL", placeholder="https://...")
 
-# プレビュー表示（再撮影モード中は非表示）
+# プレビュー表示
 if final_image_list and st.session_state.retake_index is None:
     st.markdown("###### ▼ 画像確認")
     cols_per_row = 3
@@ -389,7 +415,6 @@ if final_image_list and st.session_state.retake_index is None:
             global_idx = i + j
             with cols[j]:
                 st.image(img, caption=f"No.{global_idx+1}", use_container_width=True)
-                # 【追加】カメラ撮影モードで、かつ撮影済み画像の場合に「取り直す」ボタンを表示
                 if input_method == "📷 その場で撮影" and img in st.session_state.captured_images:
                     if st.button("🔄 取り直す", key=f"btn_retake_{global_idx}"):
                         st.session_state.retake_index = global_idx
@@ -399,7 +424,6 @@ if final_image_list and st.session_state.retake_index is None:
 st.markdown("---")
 
 st.markdown("### 3. 音声メニューの作成")
-# 再撮影中は作成ボタンを押せないようにする
 disable_create = st.session_state.retake_index is not None
 if st.button("🎙️ 作成開始", type="primary", use_container_width=True, disabled=disable_create):
     if not (api_key and target_model_name and store_name):
