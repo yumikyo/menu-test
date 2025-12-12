@@ -191,7 +191,7 @@ with st.sidebar:
     voice_options = {"女性（七海）": "ja-JP-NanamiNeural", "男性（慶太）": "ja-JP-KeitaNeural"}
     selected_voice = st.selectbox("声の種類", list(voice_options.keys()))
     voice_code = voice_options[selected_voice]
-    rate_value = "+40%"
+    rate_value = "+30%"
 
 st.title("🎧 Menu Player Generator")
 
