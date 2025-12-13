@@ -89,7 +89,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         save_path = os.path.join(output_dir, filename)
         speech_text = track['text']
         
-        # ★変更点1：チャプター番号をシンプルに読み上げる（例：1、メインメニュー）
+        # チャプター番号をシンプルに読み上げる
         if i > 0: 
              speech_text = f"{i}、{track['title']}。\n{track['text']}"
              
@@ -104,7 +104,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         progress_bar.progress(completed / total)
     return track_info_list
 
-# ★Runwithブランドカラー対応 HTMLプレイヤー生成（「最初に戻る」ボタン追加版）★
+# ★Runwithブランドカラー対応 HTMLプレイヤー生成★
 def create_standalone_html_player(store_name, menu_data, map_url=""):
     playlist_js = []
     for track in menu_data:
@@ -193,7 +193,7 @@ button {
     min-height: 70px; /* ボタンの高さを確保 */
 }
 button.play-btn { font-size: 2em; background: var(--text-orange); color: var(--bg-navy); }
-button.reset-btn { font-size: 1.2em; background: #555; color: #FFF; border-color: #999; } /* 「最初に戻る」は少し区別 */
+button.reset-btn { font-size: 1.2em; background: #555; color: #FFF; border-color: #999; }
 
 button:active { opacity: 0.8; transform: translateY(2px); }
 button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
@@ -231,9 +231,7 @@ button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
 
     <section aria-label="操作パネル" class="ctrl-group">
         <button onclick="restart()" class="reset-btn" aria-label="最初から再生する">⏮ 最初に戻る</button>
-        
         <button onclick="toggle()" id="pb" class="play-btn" aria-label="再生・一時停止">▶ 再生</button>
-        
         <div class="main-ctrl">
             <button onclick="prev()" aria-label="前の項目">⏮ 前</button>
             <button onclick="next()" aria-label="次の項目">次 ⏭</button>
@@ -395,13 +393,11 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🗣️ 音声設定")
-    # ★変更点3-A：男女の声の選択（既存機能の確認）
     voice_options = {"女性（七海）": "ja-JP-NanamiNeural", "男性（慶太）": "ja-JP-KeitaNeural"}
     selected_voice = st.selectbox("声の種類", list(voice_options.keys()))
     voice_code = voice_options[selected_voice]
     rate_value = "+10%"
 
-    # ★変更点3-B：読み上げモード（シンプル/詳細）の選択
     st.divider()
     st.subheader("📝 読み上げモード")
     reading_mode = st.radio("内容の詳しさ", ("商品名と価格のみ (シンプル)", "説明・解説付き (詳細)"), index=1)
@@ -566,7 +562,6 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True, d
             
             user_dict_str = json.dumps(user_dict, ensure_ascii=False)
             
-            # ★変更点3-C：モードに応じたプロンプトの切り替え
             mode_instruction = ""
             if "シンプル" in reading_mode:
                 mode_instruction = """
@@ -675,9 +670,10 @@ if st.session_state.generated_result:
     st.divider()
     st.subheader("📥 保存")
     
+    # ★変更点4：説明文の修正
     st.info(
         """
-        **Webプレイヤー**：視覚障害の方が見やすい「Runwithカラー（紺×オレンジ）」のプレイヤーです。  
+        **Webプレイヤー**：このファイルをスマホで開くと誰でも再生できます。LINEなどで共有してご利用ください。  
         **ZIPファイル**：PCでの保存や、My Menu Bookへの追加にご利用ください。
         """
     )
@@ -686,7 +682,6 @@ if st.session_state.generated_result:
     with c1: st.download_button(f"🌐 Webプレイヤー ({res['html_name']})", res['html_content'], res['html_name'], "text/html", type="primary")
     with c2: st.download_button(f"📦 ZIPファイル ({res['zip_name']})", data=res["zip_data"], file_name=res['zip_name'], mime="application/zip")
 
-    # --- 店頭用POP作成機能（白背景×紺文字） ---
     st.markdown("---")
     st.subheader("4. 店頭用QRコード・POP作成")
     st.info("💡 作成した「Webプレイヤー（HTMLファイル）」をお店のホームページなどにアップロードし、そのURLをここに入力してください。店頭に置けるPOPが生成されます。")
@@ -696,7 +691,6 @@ if st.session_state.generated_result:
     if public_url:
         qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={public_url}"
         
-        # POPデザイン（白背景・紺文字・オレンジアクセント）
         pop_html = f"""
         <div style="
             border: 4px solid #001F3F; 
