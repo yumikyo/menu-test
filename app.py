@@ -393,7 +393,7 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🗣️ 音声設定")
-    voice_options = {"女性（七海）": "ja-JP-NanamiNeural", "男性（慶太）": "ja-JP-KeitaNeural"}
+    voice_options = {"女性": "ja-JP-NanamiNeural", "男性": "ja-JP-KeitaNeural"}
     selected_voice = st.selectbox("声の種類", list(voice_options.keys()))
     voice_code = voice_options[selected_voice]
     rate_value = "+10%"
