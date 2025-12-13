@@ -89,8 +89,9 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         save_path = os.path.join(output_dir, filename)
         speech_text = track['text']
         
+        # ★変更点1：チャプター番号をシンプルに読み上げる（例：1、メインメニュー）
         if i > 0: 
-             speech_text = f"次は、{track['title']}です。\n{track['text']}"
+             speech_text = f"{i}、{track['title']}。\n{track['text']}"
              
         tasks.append(generate_single_track_fast(speech_text, save_path, voice_code, rate_value))
         track_info_list.append({"title": track['title'], "path": save_path})
@@ -103,7 +104,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         progress_bar.progress(completed / total)
     return track_info_list
 
-# ★Runwithブランドカラー対応 HTMLプレイヤー生成★
+# ★Runwithブランドカラー対応 HTMLプレイヤー生成（「最初に戻る」ボタン追加版）★
 def create_standalone_html_player(store_name, menu_data, map_url=""):
     playlist_js = []
     for track in menu_data:
@@ -154,13 +155,12 @@ h1 {
 }
 h2 {
     font-size: 1.4em;
-    color: var(--accent-white); /* 見出しは見やすく白で */
+    color: var(--accent-white); 
     margin-top: 30px;
     border-left: 8px solid var(--text-orange);
     padding-left: 10px;
 }
 
-/* 再生中のタイトル表示エリア（枠線オレンジ、中身は紺） */
 .box {
     background: var(--bg-navy);
     border: 4px solid var(--text-orange);
@@ -173,26 +173,31 @@ h2 {
 }
 .ti { font-size: 1.6em; font-weight: bold; color: var(--text-orange); }
 
-/* 操作ボタン（逆パターン：背景オレンジ、文字紺） */
-.ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-.play-btn-area { grid-column: 1 / -1; margin-bottom: 10px; }
+/* コントロールエリアのレイアウト調整 */
+.ctrl-group {
+    display: flex; flex-direction: column; gap: 15px; margin-bottom: 15px;
+}
+.main-ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
 
 button {
     width: 100%;
     padding: 20px 0;
-    font-size: 2em; 
+    font-size: 1.5em; 
     font-weight: bold;
-    color: var(--bg-navy);     /* 文字は紺 */
-    background: var(--text-orange); /* 背景はオレンジ */
+    color: var(--bg-navy);
+    background: var(--text-orange);
     border: 2px solid var(--accent-white);
     border-radius: 12px; 
     cursor: pointer;
     touch-action: manipulation;
+    min-height: 70px; /* ボタンの高さを確保 */
 }
+button.play-btn { font-size: 2em; background: var(--text-orange); color: var(--bg-navy); }
+button.reset-btn { font-size: 1.2em; background: #555; color: #FFF; border-color: #999; } /* 「最初に戻る」は少し区別 */
+
 button:active { opacity: 0.8; transform: translateY(2px); }
 button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
 
-/* 地図ボタン（特別色：白背景に紺文字） */
 .map-btn {
     display: block; width: 100%; padding: 20px; 
     background-color: var(--accent-white); color: var(--bg-navy); 
@@ -200,14 +205,12 @@ button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
     border: 2px solid var(--text-orange); box-sizing: border-box; text-align: center;
 }
 
-/* リスト表示 */
 .lst { border-top: 2px solid var(--text-orange); margin-top: 20px; }
 .itm {
     padding: 20px 10px; 
     border-bottom: 1px solid #555; 
     cursor: pointer; font-size: 1.3em; color: var(--accent-white);
 }
-/* アクティブな項目（逆パターン：背景薄オレンジ、文字紺） */
 .itm.active {
     background: var(--text-orange); 
     color: var(--bg-navy); 
@@ -226,11 +229,12 @@ button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
 
     <audio id="au" style="width:1px;height:1px;opacity:0;"></audio>
 
-    <section aria-label="操作パネル">
-        <div class="play-btn-area">
-            <button onclick="toggle()" id="pb" aria-label="再生・一時停止">▶ 再生</button>
-        </div>
-        <div class="ctrl">
+    <section aria-label="操作パネル" class="ctrl-group">
+        <button onclick="restart()" class="reset-btn" aria-label="最初から再生する">⏮ 最初に戻る</button>
+        
+        <button onclick="toggle()" id="pb" class="play-btn" aria-label="再生・一時停止">▶ 再生</button>
+        
+        <div class="main-ctrl">
             <button onclick="prev()" aria-label="前の項目">⏮ 前</button>
             <button onclick="next()" aria-label="次の項目">次 ⏭</button>
         </div>
@@ -271,6 +275,12 @@ function toggle(){
         au.pause();
         pb.innerText="▶ 再生";
     }
+}
+function restart(){
+    idx=0;
+    ld(0);
+    au.play();
+    pb.innerText="⏸ 一時停止";
 }
 function next(){
     if(idx<pl.length-1){ ld(idx+1); au.play(); pb.innerText="⏸ 一時停止"; }
@@ -385,10 +395,16 @@ with st.sidebar:
     
     st.divider()
     st.subheader("🗣️ 音声設定")
+    # ★変更点3-A：男女の声の選択（既存機能の確認）
     voice_options = {"女性（七海）": "ja-JP-NanamiNeural", "男性（慶太）": "ja-JP-KeitaNeural"}
     selected_voice = st.selectbox("声の種類", list(voice_options.keys()))
     voice_code = voice_options[selected_voice]
     rate_value = "+10%"
+
+    # ★変更点3-B：読み上げモード（シンプル/詳細）の選択
+    st.divider()
+    st.subheader("📝 読み上げモード")
+    reading_mode = st.radio("内容の詳しさ", ("商品名と価格のみ (シンプル)", "説明・解説付き (詳細)"), index=1)
 
     # 辞書機能
     st.divider()
@@ -550,6 +566,20 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True, d
             
             user_dict_str = json.dumps(user_dict, ensure_ascii=False)
             
+            # ★変更点3-C：モードに応じたプロンプトの切り替え
+            mode_instruction = ""
+            if "シンプル" in reading_mode:
+                mode_instruction = """
+                - 商品名と価格だけを簡潔に読み上げてください。
+                - 「美味しそうです」などの形容詞や説明は一切省いてください。
+                - 挨拶や余計な言葉は不要です。淡々と情報を伝えてください。
+                """
+            else:
+                mode_instruction = """
+                - 写真から「美味しそうな特徴（赤くて辛そう、ボリュームがある等）」が分かれば、一言添えて魅力を伝えてください。
+                - ユーザーが料理のイメージができるような丁寧なガイドを心がけてください。
+                """
+
             prompt = f"""
             役割設定:
             あなたは視覚障害者の外食をサポートするパートナー「Runwith Menu AI」です。
@@ -561,18 +591,17 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True, d
                （良い例：「前菜」「メイン」「ドリンク」のようにまとめる）
             
             2. 読み上げ原稿のルール:
-               - 各チャプターの冒頭で「次は〇〇のメニューです」とガイドを入れる。
                - 商品名ははっきりと。価格は必ず「円」をつけて読む。
-               - 写真から「美味しそうな特徴（赤くて辛そう、ボリュームがある等）」が分かれば、一言添えて魅力を伝える。
                - アレルギー情報や注意事項は絶対に省略しない。
+               {mode_instruction}
 
             ★最重要：以下の固有名詞・読み方辞書を必ず守ってください。
             {user_dict_str}
 
             出力フォーマット（JSONのみ）:
             [
-              {{"title": "カテゴリー名（例：おすすめ・フェア）", "text": "まずは、今月のおすすめメニューです。旬のいちごパフェ、1200円。写真では山盛りのイチゴが乗っていてとても豪華です。"}},
-              {{"title": "カテゴリー名（例：メイン料理）", "text": "続いてメイン料理です。ハンバーグ定食1000円。ステーキ1500円..."}}
+              {{"title": "カテゴリー名（例：おすすめ・フェア）", "text": "読み上げテキスト..."}},
+              {{"title": "カテゴリー名（例：メイン料理）", "text": "読み上げテキスト..."}}
             ]
             """
             
