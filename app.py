@@ -24,16 +24,11 @@ nest_asyncio.apply()
 # ページ設定
 st.set_page_config(page_title="Runwith Menu AI Generator", layout="wide")
 
-# CSSでボタンのスタイル調整（間隔確保）
+# CSSでボタンのスタイル調整
 st.markdown("""
 <style>
-    div[data-testid="column"] {
-        margin-bottom: 10px;
-    }
-    /* Streamlit自体のUIも少し見やすく調整 */
-    .stButton>button {
-        font-weight: bold;
-    }
+    div[data-testid="column"] { margin-bottom: 10px; }
+    .stButton>button { font-weight: bold; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -88,14 +83,12 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     tasks = []
     track_info_list = []
     
-    # イントロダクション（目次）がある場合はそのまま
     for i, track in enumerate(menu_data):
         safe_title = sanitize_filename(track['title'])
-        filename = f"{i:02}_{safe_title}.mp3" # 00_はじめに, 01_メイン... となるように調整
+        filename = f"{i:02}_{safe_title}.mp3"
         save_path = os.path.join(output_dir, filename)
         speech_text = track['text']
         
-        # はじめに(i=0)以外は、チャプター名を読み上げてから本文に入る
         if i > 0: 
              speech_text = f"次は、{track['title']}です。\n{track['text']}"
              
@@ -110,7 +103,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         progress_bar.progress(completed / total)
     return track_info_list
 
-# ★改良版：視覚障害者向けハイコントラストHTMLプレイヤー生成★
+# ★Runwithブランドカラー対応 HTMLプレイヤー生成★
 def create_standalone_html_player(store_name, menu_data, map_url=""):
     playlist_js = []
     for track in menu_data:
@@ -134,54 +127,92 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
     html_template = """<!DOCTYPE html>
 <html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>__STORE_NAME__ 音声ガイド</title>
 <style>
-/* 視覚障害者向けハイコントラスト設定 (黒背景・黄色文字) */
-body{font-family:"Helvetica", "Arial", sans-serif; background:#000000; color:#FFFF00; margin:0; padding:15px; line-height:1.8;}
-.c{max-width:600px; margin:0 auto;}
-
-h1{text-align:center; font-size:1.8em; color:#FFFF00; border-bottom: 2px solid #FFFF00; padding-bottom:10px;}
-h2{font-size:1.4em; color:#FFFFFF; margin-top:30px; border-left: 8px solid #FFFF00; padding-left:10px;}
-
-/* 再生中のタイトル表示エリア */
-.box{background:#222; border:4px solid #FFFF00; border-radius:12px; padding:20px; text-align:center; margin-bottom:20px; min-height:80px; display:flex; align-items:center; justify-content:center;}
-.ti{font-size:1.6em; font-weight:bold; color:#FFFF00;}
-
-/* 操作ボタン（巨大化・押しやすく） */
-.ctrl{display:grid; grid-template-columns: 1fr 1fr; gap:15px; margin-bottom:15px;}
-.play-btn-area{grid-column: 1 / -1; margin-bottom: 10px;}
-
-button{
-    width: 100%;
-    padding:20px 0;
-    font-size:2em; 
-    font-weight:bold;
-    color:#000000;
-    background:#FFFF00; 
-    border:3px solid #FFFFFF;
-    border-radius:12px; 
-    cursor:pointer;
-    touch-action: manipulation; /* スマホでの連打防止 */
+/* Runwithブランドカラー設定 */
+:root {
+    --bg-navy: #001F3F;      /* 背景：紺 */
+    --text-orange: #FF851B;  /* 文字：明るいオレンジ */
+    --accent-white: #FFFFFF; /* アクセント：白 */
 }
-button:active {background:#FFD700; transform: translateY(2px);}
-button:focus, .map-btn:focus {outline:4px solid #FFFFFF; outline-offset: 4px;}
 
-.map-btn{
-    display:block; width:100%; padding:20px; 
-    background-color:#0044CC; color:#FFFFFF; 
-    text-decoration:none; border-radius:12px; font-size:1.4em; font-weight:bold;
-    border: 2px solid #fff; box-sizing: border-box;
+body {
+    font-family: "Helvetica", "Arial", sans-serif;
+    background: var(--bg-navy);
+    color: var(--text-orange);
+    margin: 0;
+    padding: 15px;
+    line-height: 1.8;
+}
+
+.c { max-width: 600px; margin: 0 auto; }
+
+h1 {
     text-align: center;
+    font-size: 1.8em;
+    color: var(--text-orange);
+    border-bottom: 2px solid var(--text-orange);
+    padding-bottom: 10px;
+}
+h2 {
+    font-size: 1.4em;
+    color: var(--accent-white); /* 見出しは見やすく白で */
+    margin-top: 30px;
+    border-left: 8px solid var(--text-orange);
+    padding-left: 10px;
+}
+
+/* 再生中のタイトル表示エリア（枠線オレンジ、中身は紺） */
+.box {
+    background: var(--bg-navy);
+    border: 4px solid var(--text-orange);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+    margin-bottom: 20px;
+    min-height: 80px;
+    display: flex; align-items: center; justify-content: center;
+}
+.ti { font-size: 1.6em; font-weight: bold; color: var(--text-orange); }
+
+/* 操作ボタン（逆パターン：背景オレンジ、文字紺） */
+.ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+.play-btn-area { grid-column: 1 / -1; margin-bottom: 10px; }
+
+button {
+    width: 100%;
+    padding: 20px 0;
+    font-size: 2em; 
+    font-weight: bold;
+    color: var(--bg-navy);     /* 文字は紺 */
+    background: var(--text-orange); /* 背景はオレンジ */
+    border: 2px solid var(--accent-white);
+    border-radius: 12px; 
+    cursor: pointer;
+    touch-action: manipulation;
+}
+button:active { opacity: 0.8; transform: translateY(2px); }
+button:focus { outline: 4px solid var(--accent-white); outline-offset: 4px; }
+
+/* 地図ボタン（特別色：白背景に紺文字） */
+.map-btn {
+    display: block; width: 100%; padding: 20px; 
+    background-color: var(--accent-white); color: var(--bg-navy); 
+    text-decoration: none; border-radius: 12px; font-size: 1.4em; font-weight: bold;
+    border: 2px solid var(--text-orange); box-sizing: border-box; text-align: center;
 }
 
 /* リスト表示 */
-.lst{border-top:2px solid #555; margin-top:20px;}
-.itm{
-    padding:20px 10px; 
-    border-bottom:2px solid #555; 
-    cursor:pointer; font-size:1.3em; color: #FFF;
+.lst { border-top: 2px solid var(--text-orange); margin-top: 20px; }
+.itm {
+    padding: 20px 10px; 
+    border-bottom: 1px solid #555; 
+    cursor: pointer; font-size: 1.3em; color: var(--accent-white);
 }
-.itm.active{
-    background:#FFFF00; color:#000000; font-weight:bold; 
-    border-left:10px solid #FFF;
+/* アクティブな項目（逆パターン：背景薄オレンジ、文字紺） */
+.itm.active {
+    background: var(--text-orange); 
+    color: var(--bg-navy); 
+    font-weight: bold; 
+    border-left: 10px solid var(--accent-white);
 }
 </style></head>
 <body>
@@ -275,7 +306,7 @@ init();
     final_html = final_html.replace("__MAP_BUTTON__", map_button_html)
     return final_html
 
-# プレビュー用プレイヤー（ここは確認用なので通常のデザインのまま）
+# プレビュー用プレイヤー
 def render_preview_player(tracks):
     playlist_data = []
     for track in tracks:
@@ -288,20 +319,20 @@ def render_preview_player(tracks):
     html_template = """<!DOCTYPE html><html><head><style>
     body{margin:0;padding:0;font-family:sans-serif;}
     .p-box{border:2px solid #e0e0e0;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}
-    .t-ti{font-size:18px;font-weight:bold;color:#333;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #ff4b4b;}
+    .t-ti{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}
     .ctrls{display:flex; gap:10px; margin:15px 0;}
     button {
         flex: 1;
-        background-color: #ff4b4b; color: white; border: none;
+        background-color: #001F3F; color: #FF851B; border: none;
         border-radius: 8px; font-size: 24px; padding: 10px 0;
         cursor: pointer; line-height: 1; min-height: 50px;
     }
-    button:hover { background-color: #e04141; }
+    button:hover { background-color: #003366; }
     button:focus { outline: 3px solid #333; outline-offset: 2px; }
     .lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}
     .it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}
     .it:focus{outline:2px solid #333; background:#eee;}
-    .it.active{color:#b71c1c;font-weight:bold;background:#ffecec;}
+    .it.active{color:#FF851B;font-weight:bold;background:#001F3F;}
     </style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio>
     <div class="ctrls">
         <button onclick="pv()" aria-label="前へ">⏮</button>
@@ -359,15 +390,12 @@ with st.sidebar:
     voice_code = voice_options[selected_voice]
     rate_value = "+10%"
 
-    # --- 辞書機能 (Sidebar) ---
+    # 辞書機能
     st.divider()
     st.subheader("📖 辞書登録")
-    st.caption("よく間違える読み方を登録すると、AIが学習します。(例: 豚肉 -> ぶたにく)")
-    
-    # 辞書のロード
+    st.caption("よく間違える読み方を登録してください。")
     user_dict = load_dictionary()
     
-    # 新規登録
     with st.form("dict_form", clear_on_submit=True):
         c_word, c_read = st.columns(2)
         new_word = c_word.text_input("単語", placeholder="例: 辛口")
@@ -379,7 +407,6 @@ with st.sidebar:
                 st.success(f"「{new_word}」を登録しました！")
                 st.rerun()
 
-    # 登録済みリスト（削除機能）
     if user_dict:
         with st.expander(f"登録済み単語 ({len(user_dict)})"):
             for word, read in list(user_dict.items()):
@@ -390,10 +417,10 @@ with st.sidebar:
                     save_dictionary(user_dict)
                     st.rerun()
 
-st.title("🎧 Menu Voice Mate")
-st.caption("Powered by Runwith AI - 視覚障がいのある方のための、伴走型音声メニュー作成ツール")
+st.title("🎧 Runwith Menu AI")
+st.caption("Powered by Runwith AI - 伴走型音声メニュー作成ツール")
 
-# 再撮影する画像のインデックスを保持するstate
+# State管理
 if 'retake_index' not in st.session_state: st.session_state.retake_index = None
 if 'captured_images' not in st.session_state: st.session_state.captured_images = []
 if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
@@ -521,10 +548,8 @@ if st.button("🎙️ 作成開始", type="primary", use_container_width=True, d
             model = genai.GenerativeModel(target_model_name)
             parts = []
             
-            # 辞書データの取得とJSON文字列化
             user_dict_str = json.dumps(user_dict, ensure_ascii=False)
             
-            # ★改良されたプロンプト：ガイドとしての役割を付与★
             prompt = f"""
             役割設定:
             あなたは視覚障害者の外食をサポートするパートナー「Runwith Menu AI」です。
@@ -623,7 +648,7 @@ if st.session_state.generated_result:
     
     st.info(
         """
-        **Webプレイヤー**：アクセシビリティ対応済みのHTMLファイルです。スマホへの保存やLINE共有に便利です。  
+        **Webプレイヤー**：視覚障害の方が見やすい「Runwithカラー（紺×オレンジ）」のプレイヤーです。  
         **ZIPファイル**：PCでの保存や、My Menu Bookへの追加にご利用ください。
         """
     )
@@ -631,3 +656,51 @@ if st.session_state.generated_result:
     c1, c2 = st.columns(2)
     with c1: st.download_button(f"🌐 Webプレイヤー ({res['html_name']})", res['html_content'], res['html_name'], "text/html", type="primary")
     with c2: st.download_button(f"📦 ZIPファイル ({res['zip_name']})", data=res["zip_data"], file_name=res['zip_name'], mime="application/zip")
+
+    # --- 店頭用POP作成機能（白背景×紺文字） ---
+    st.markdown("---")
+    st.subheader("4. 店頭用QRコード・POP作成")
+    st.info("💡 作成した「Webプレイヤー（HTMLファイル）」をお店のホームページなどにアップロードし、そのURLをここに入力してください。店頭に置けるPOPが生成されます。")
+
+    public_url = st.text_input("公開したメニューのURLを入力", placeholder="例：https://www.example.com/menu_player.html")
+
+    if public_url:
+        qr_api_url = f"https://api.qrserver.com/v1/create-qr-code/?size=200x200&data={public_url}"
+        
+        # POPデザイン（白背景・紺文字・オレンジアクセント）
+        pop_html = f"""
+        <div style="
+            border: 4px solid #001F3F; 
+            padding: 30px; 
+            background: #FFF; 
+            text-align: center; 
+            max-width: 400px; 
+            margin: 0 auto; 
+            font-family: 'Hiragino Kaku Gothic Pro', 'Meiryo', sans-serif;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.2);
+            color: #001F3F;
+        ">
+            <h2 style="color: #001F3F; margin-bottom: 10px; font-size: 24px; border-bottom: 3px solid #FF851B; display:inline-block; padding-bottom:5px;">
+                🎧 音声メニュー
+            </h2>
+            <p style="font-size: 16px; font-weight: bold; margin: 20px 0;">
+                視覚に障害のある方へ<br>
+                スマホで読み上げメニューが使えます
+            </p>
+            
+            <img src="{qr_api_url}" alt="QR Code" style="width: 180px; height: 180px; margin: 10px auto; border: 2px solid #FF851B; padding:5px;">
+            
+            <p style="font-size: 14px; color: #001F3F; margin-top: 20px; text-align: left; background: #FFD59E; padding: 15px; border-radius: 8px;">
+                <strong>飲食店の方へ：</strong><br>
+                音声メニューが必要なお客様がいらした際に、ご自身のスマホでこのQRコードを読み取ってもらってください。
+            </p>
+            
+            <div style="margin-top: 15px; font-weight: bold; font-size: 18px; color: #FF851B;">
+                {store_name}
+            </div>
+        </div>
+        """
+        
+        st.markdown("### ▼ 店頭用POPプレビュー")
+        st.caption("この画面をスクリーンショットを撮るか、印刷してご利用ください。")
+        components.html(pop_html, height=600, scrolling=True)
