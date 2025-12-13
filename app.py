@@ -24,7 +24,7 @@ nest_asyncio.apply()
 # ページ設定
 st.set_page_config(page_title="Menu Player Generator", layout="wide")
 
-# CSSでボタンのスタイル調整（間隔確保）
+# CSSでボタンのスタイル調整
 st.markdown("""
 <style>
     div[data-testid="column"] {
@@ -371,12 +371,8 @@ with st.sidebar:
 st.title("🎧 Menu Player Generator")
 st.caption("視覚障がいのある方のための、アクセシビリティに配慮した音声メニューを作成します。")
 
-# 再撮影する画像のインデックスを保持するstate
-if 'retake_index' not in st.session_state: st.session_state.retake_index = None
-if 'captured_images' not in st.session_state: st.session_state.captured_images = []
-if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
+# セッション状態の初期化
 if 'generated_result' not in st.session_state: st.session_state.generated_result = None
-if 'show_camera' not in st.session_state: st.session_state.show_camera = False
 
 # Step 1
 st.markdown("### 1. お店情報の入力")
@@ -391,73 +387,28 @@ if map_url:
 st.markdown("---")
 
 st.markdown("### 2. メニューの登録")
-input_method = st.radio("方法", ("📂 アルバムから", "📷 その場で撮影", "🌐 URL入力"), horizontal=True)
+# カメラとアルバムを「画像」として一本化
+input_method = st.radio("方法", ("🖼️ 画像 (撮影・アルバム)", "🌐 URL入力"), horizontal=True)
 
 final_image_list = []
 target_url = None
 
-if input_method == "📂 アルバムから":
-    uploaded_files = st.file_uploader("写真を選択", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
-    if uploaded_files: final_image_list.extend(uploaded_files)
-
-elif input_method == "📷 その場で撮影":
-    if st.session_state.retake_index is not None:
-        target_idx = st.session_state.retake_index
-        st.warning(f"No.{target_idx + 1} の画像を再撮影中...")
-        retake_camera_key = f"retake_camera_{target_idx}_{st.session_state.camera_key}"
-        camera_file = st.camera_input("写真を撮影する (取り直し)", key=retake_camera_key)
-        
-        c1, c2 = st.columns(2, gap="large")
-        with c1:
-            if camera_file and st.button("✅ これで決定", type="primary", key="retake_confirm", use_container_width=True):
-                st.session_state.captured_images[target_idx] = camera_file
-                st.session_state.retake_index = None
-                st.session_state.show_camera = False 
-                st.session_state.camera_key += 1
-                st.rerun()
-        with c2:
-            if st.button("❌ キャンセル", key="retake_cancel", use_container_width=True):
-                st.session_state.retake_index = None
-                st.session_state.show_camera = False
-                st.rerun()
-
-    elif not st.session_state.show_camera:
-        if st.button("📷 カメラ起動", type="primary"):
-            st.session_state.show_camera = True
-            st.rerun()
-    else:
-        camera_file = st.camera_input("写真を撮影する", key=f"camera_{st.session_state.camera_key}")
-        if camera_file:
-            c_btn1, c_btn2 = st.columns(2, gap="large")
-            with c_btn1:
-                if st.button("⬇️ 追加して次を撮る", type="primary", use_container_width=True):
-                    st.session_state.captured_images.append(camera_file)
-                    st.session_state.camera_key += 1
-                    st.rerun()
-            with c_btn2:
-                if st.button("✅ 追加して終了", type="primary", use_container_width=True):
-                    st.session_state.captured_images.append(camera_file)
-                    st.session_state.show_camera = False
-                    st.session_state.camera_key += 1
-                    st.rerun()
-        else:
-            if st.button("❌ 撮影を中止", use_container_width=True):
-                st.session_state.show_camera = False
-                st.rerun()
-            
-    if st.session_state.captured_images:
-        if st.session_state.retake_index is None and st.session_state.show_camera is False:
-             if st.button("🗑️ 全て削除"):
-                st.session_state.captured_images = []
-                st.rerun()
-        final_image_list.extend(st.session_state.captured_images)
+if input_method == "🖼️ 画像 (撮影・アルバム)":
+    st.info("下のボタンから画像をアップロードしてください。スマホの場合は「写真を撮る」または「ライブラリ」を選択できます。")
+    # accept_multiple_files=Trueにより、複数枚を一括で、または連続して追加可能
+    uploaded_files = st.file_uploader("メニュー画像を選択・撮影", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+    
+    if uploaded_files:
+        final_image_list = uploaded_files
+        st.success(f"{len(uploaded_files)} 枚の画像が選択されています。")
 
 elif input_method == "🌐 URL入力":
     target_url = st.text_input("URL", placeholder="https://...")
 
-if final_image_list and st.session_state.retake_index is None:
+# 画像確認用グリッド
+if final_image_list:
     st.markdown("###### ▼ 画像確認")
-    cols_per_row = 3
+    cols_per_row = 4
     for i in range(0, len(final_image_list), cols_per_row):
         cols = st.columns(cols_per_row, gap="medium")
         batch = final_image_list[i:i+cols_per_row]
@@ -465,25 +416,11 @@ if final_image_list and st.session_state.retake_index is None:
             global_idx = i + j
             with cols[j]:
                 st.image(img, caption=f"No.{global_idx+1}", use_container_width=True)
-                if input_method == "📷 その場で撮影" and img in st.session_state.captured_images:
-                    c_retake, c_delete = st.columns(2, gap="small")
-                    with c_retake:
-                        if st.button("🔄 撮り直す", key=f"btn_retake_{global_idx}", use_container_width=True):
-                            st.session_state.retake_index = global_idx
-                            st.session_state.show_camera = True
-                            st.rerun()
-                    with c_delete:
-                        if st.button("🗑️ 削除", key=f"btn_delete_{global_idx}", use_container_width=True):
-                            st.session_state.captured_images.pop(global_idx)
-                            st.session_state.retake_index = None
-                            st.session_state.show_camera = False
-                            st.rerun()
 
 st.markdown("---")
 
 st.markdown("### 3. 音声メニューの作成")
-disable_create = st.session_state.retake_index is not None
-if st.button("🎙️ 作成開始", type="primary", use_container_width=True, disabled=disable_create):
+if st.button("🎙️ 作成開始", type="primary", use_container_width=True):
     if not (api_key and target_model_name and store_name):
         st.error("設定や店舗名を確認してください"); st.stop()
     if not (final_image_list or target_url):
