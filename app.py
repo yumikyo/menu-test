@@ -723,29 +723,25 @@ with st.sidebar:
                            ("💬 商品名と価格のみ (シンプル)", "🌟 説明・解説付き (詳細)"), 
                            index=1, horizontal=True)
 
-    # 辞書機能
-    st.divider()
-    st.header("📖 カスタム辞書")
-    st.caption("店独自の読み方を登録（例：店名・固有名詞）")
-    user_dict = load_dictionary()
-    
+     # 新規登録
     with st.form("dict_form", clear_on_submit=True):
-        col1, col2 = st.columns([3,1])
-        new_word = col1.text_input("単語", placeholder="例: タナカ丼")
-        new_read = col1.text_input("読み", placeholder="例: たなかどん")
-        if col2.form_submit_button("➕ 追加", use_container_width=True):
+        c_word, c_read = st.columns(2)
+        new_word = c_word.text_input("単語", placeholder="例: 辛口")
+        new_read = c_read.text_input("読み", placeholder="例: からくち")
+        if st.form_submit_button("➕ 追加"):
             if new_word and new_read:
                 user_dict[new_word] = new_read
                 save_dictionary(user_dict)
-                st.success(f"✅ 「{new_word}」を登録完了！")
+                st.success(f"「{new_word}」を登録しました！")
                 st.rerun()
 
+    # 登録済みリスト（削除機能）
     if user_dict:
-        with st.expander(f"📚 登録済み ({len(user_dict)}語)"):
+        with st.expander(f"登録済み単語 ({len(user_dict)})"):
             for word, read in list(user_dict.items()):
-                col1, col2 = st.columns([3,1])
-                col1.markdown(f"**{word}** → `{read}`")
-                if col2.button("🗑️", key=f"del_{hash(word)}", use_container_width=True):
+                c1, c2 = st.columns([3, 1])
+                c1.text(f"{word} ➡ {read}")
+                if c2.button("🗑️", key=f"del_{word}"):
                     del user_dict[word]
                     save_dictionary(user_dict)
                     st.rerun()
