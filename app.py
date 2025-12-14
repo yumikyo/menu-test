@@ -195,6 +195,7 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
         </div>
         """
 
+    # ここからHTMLテンプレート（非常に長い文字列）です。途中で切れないように注意してください。
     html_template = """<!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -461,4 +462,375 @@ def render_preview_player(tracks):
     </div>
     <div id="ls" class="lst" role="list"></div></div>
     <script>
-    const pl=__PLAYLIST__;let x=0;const au=document.getElementById('
+    const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');
+    function init(){rn();ld(0);sp();}
+    function ld(i){x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();sp();}
+    function tg(){if(au.paused){au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}else{au.pause();pb.innerText="▶";pb.setAttribute("aria-label","再生");}}
+    function nx(){if(x<pl.length-1){ld(x+1);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}}
+    function pv(){if(x>0){ld(x-1);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}}
+    function sp(){au.playbackRate=parseFloat(document.getElementById('sp').value);}
+    au.onended=function(){if(x<pl.length-1)nx();else{pb.innerText="▶";pb.setAttribute("aria-label","再生");}};
+    function rn(){ls.innerHTML="";pl.forEach((t,i)=>{
+        const d=document.createElement('div');
+        d.className="it "+(i===x?"active":"");
+        let l=t.title; if(i>0){l=i+". "+t.title;}
+        d.innerText=l;
+        d.setAttribute("role","listitem");d.setAttribute("tabindex","0");d.onclick=()=>{ld(i);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");};d.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();d.click();}};ls.appendChild(d);});}
+    init();</script></body></html>"""
+    
+    final_html = html_template.replace("__PLAYLIST__", playlist_json)
+    components.html(final_html, height=450)
+
+# ----------------------------
+# サイドバー（設定）
+# ----------------------------
+
+with st.sidebar:
+    st.markdown("""
+    <div style='background:#001F3F;color:#FF851B;padding:20px;border-radius:15px;text-align:center;font-weight:bold;font-size:18px;'>
+        Runwith Menu Maker
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.header("🔧 システム設定")
+    if "GEMINI_API_KEY" in st.secrets:
+        api_key = st.secrets["GEMINI_API_KEY"]
+        st.success("✅ APIキー認証済み")
+    else:
+        api_key = st.text_input("🔑 Gemini APIキー", type="password")
+    
+    # モデル選択
+    valid_models = []
+    target_model_name = None
+    if api_key:
+        try:
+            genai.configure(api_key=api_key)
+            all_models = list(genai.list_models())
+            valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
+            default_idx = next((i for i, n in enumerate(valid_models) if "flash" in n.lower()), 0)
+            target_model_name = st.selectbox("🤖 AIモデル", valid_models, index=default_idx)
+        except Exception as e:
+            st.error(f"APIエラー: {e}")
+    
+    st.divider()
+    st.header("🗣️ 音声設定")
+    # 表示名シンプル化、デフォルト速度+10%
+    voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
+    selected_voice = st.radio("声の種類", list(voice_options.keys()), horizontal=True)
+    voice_code = voice_options[selected_voice]
+    rate_value = "+10%"
+
+    st.divider()
+    st.header("📝 読み上げモード")
+    reading_mode = st.radio(
+        "情報の詳しさ", 
+        ("💬 シンプル (商品名と価格)", "🌟 詳細 (説明・イメージ付き)"), 
+        index=0
+    )
+
+    st.divider()
+    st.subheader("📖 読み方辞書")
+    st.caption("AIが読み間違える単語を登録してください。")
+    
+    user_dict = load_dictionary()
+    with st.form("dict_form", clear_on_submit=True):
+        c_word, c_read = st.columns(2)
+        new_word = c_word.text_input("単語", placeholder="例: 辛口")
+        new_read = c_read.text_input("読み", placeholder="例: からくち")
+        if st.form_submit_button("➕ 追加"):
+            if new_word and new_read:
+                user_dict[new_word] = new_read
+                save_dictionary(user_dict)
+                st.success(f"登録: {new_word} -> {new_read}")
+                st.rerun()
+
+    if user_dict:
+        with st.expander(f"登録済み ({len(user_dict)})"):
+            for word, read in list(user_dict.items()):
+                c1, c2 = st.columns([3, 1])
+                c1.text(f"{word} : {read}")
+                if c2.button("🗑️", key=f"del_{word}"):
+                    del user_dict[word]
+                    save_dictionary(user_dict)
+                    st.rerun()
+
+# ----------------------------
+# メイン画面
+# ----------------------------
+
+st.markdown("""
+<div style='background: linear-gradient(135deg, #001F3F 0%, #003366 100%); color: #FF851B; padding: 30px; border-radius: 20px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);'>
+    <h1 style='font-size: 2.5em; margin: 0; color: #FFFFFF;'>🎧 Runwith Menu Maker</h1>
+    <p style='font-size: 1.3em; margin: 10px 0 0 0; color: #FF851B; font-weight: bold;'>
+        音声メニュー作成ツール
+    </p>
+</div>
+""", unsafe_allow_html=True)
+
+# State管理
+if 'retake_index' not in st.session_state: st.session_state.retake_index = None
+if 'captured_images' not in st.session_state: st.session_state.captured_images = []
+if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
+if 'generated_result' not in st.session_state: st.session_state.generated_result = None
+if 'show_camera' not in st.session_state: st.session_state.show_camera = False
+
+# Step 1: お店情報
+st.markdown("### 🏪 1. 店舗情報入力")
+col1, col2 = st.columns(2)
+with col1: 
+    store_name = st.text_input("🏠 店名（必須）", placeholder="例：Runwith Cafe")
+with col2: 
+    menu_title = st.text_input("📖 メニュー名（任意）", placeholder="例：ランチメニュー")
+
+map_url = st.text_input("📍 GoogleマップURL（任意）", placeholder="https://goo.gl/maps/...")
+st.caption("※プレイヤーに地図へのアクセスボタンが表示されます。")
+
+st.markdown("---")
+
+# Step 2: メニュー登録
+st.markdown("### 📸 2. メニュー素材の登録")
+input_method = st.radio("入力方法", ("📂 ファイル選択", "📷 カメラ撮影", "🌐 Web URL"), index=0, horizontal=True)
+
+final_image_list = []
+target_url = None
+
+if input_method == "📂 ファイル選択":
+    uploaded_files = st.file_uploader("メニュー画像", type=['png', 'jpg', 'jpeg'], accept_multiple_files=True)
+    if uploaded_files:
+        final_image_list.extend(uploaded_files)
+
+elif input_method == "📷 カメラ撮影":
+    st.info("💡 **ヒント**: カメラが「インカメラ」で起動する場合は、画面内の回転アイコンで切り替えてください。")
+    st.caption("※ブラウザのカメラ許可を「許可」に設定してください。")
+    
+    # 撮り直しモード
+    if st.session_state.retake_index is not None:
+        st.warning(f"No.{st.session_state.retake_index + 1} を再撮影中...")
+        cam_file = st.camera_input("再撮影", key=f"retake_{st.session_state.camera_key}")
+        
+        c1, c2 = st.columns(2)
+        with c1:
+            if cam_file and st.button("決定 (上書き)"):
+                st.session_state.captured_images[st.session_state.retake_index] = cam_file
+                st.session_state.retake_index = None
+                st.session_state.camera_key += 1
+                st.rerun()
+        with c2:
+            if st.button("キャンセル"):
+                st.session_state.retake_index = None
+                st.rerun()
+    else:
+        # 通常撮影モード（常に表示・ボタンなし）
+        cam_file = st.camera_input("メニューを撮影", key=f"cam_{st.session_state.camera_key}")
+        
+        if cam_file:
+            col1, col2 = st.columns(2)
+            with col1:
+                # 続けて撮影
+                if st.button("➕ 追加して次へ", type="primary"):
+                    st.session_state.captured_images.append(cam_file)
+                    st.session_state.camera_key += 1
+                    st.rerun()
+            with col2:
+                # 撮影終了
+                if st.button("✅ 撮影終了 (次へ)"):
+                    st.session_state.captured_images.append(cam_file)
+                    st.session_state.camera_key += 1
+                    st.rerun()
+    
+    # 撮影済みリストの表示
+    if st.session_state.captured_images and st.session_state.retake_index is None:
+        if st.button("🗑️ 全て削除"):
+            st.session_state.captured_images = []
+            st.rerun()
+        final_image_list.extend(st.session_state.captured_images)
+
+elif input_method == "🌐 Web URL":
+    target_url = st.text_input("読み取りたいURL", placeholder="https://...")
+
+# 画像プレビュー & 削除/再撮影
+if final_image_list and st.session_state.retake_index is None:
+    st.markdown("#### ▼ 登録画像")
+    cols = st.columns(3)
+    for i, img in enumerate(final_image_list):
+        with cols[i % 3]:
+            st.image(img, caption=f"No.{i+1}", use_column_width=True)
+            if input_method == "📷 カメラ撮影":
+                c1, c2 = st.columns(2)
+                if c1.button("再撮影", key=f"rt_{i}"):
+                    st.session_state.retake_index = i
+                    st.rerun()
+                if c2.button("削除", key=f"del_{i}"):
+                    st.session_state.captured_images.pop(i)
+                    st.rerun()
+
+st.markdown("---")
+
+# Step 3: 生成実行
+st.markdown("### 🚀 3. 音声メニュー生成")
+
+can_run = (final_image_list or target_url) and api_key and store_name and st.session_state.retake_index is None
+
+if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not can_run, use_container_width=True):
+    with st.spinner('Runwith Menu AI が解析中...'):
+        output_dir = "menu_audio_temp"
+        if os.path.exists(output_dir): shutil.rmtree(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
+
+        try:
+            genai.configure(api_key=api_key)
+            model = genai.GenerativeModel(target_model_name)
+            
+            user_dict_str = json.dumps(user_dict, ensure_ascii=False)
+            
+            # ★変更点3-C：モードに応じたプロンプトの切り替え
+            mode_instruction = ""
+            if "シンプル" in reading_mode:
+                mode_instruction = """
+                - 商品名と価格だけを簡潔に読み上げてください。
+                - 「美味しそうです」などの形容詞や説明は一切省いてください。
+                - 挨拶や余計な言葉は不要です。淡々と情報を伝えてください。
+                """
+            else:
+                mode_instruction = """
+                - 写真から「美味しそうな特徴（赤くて辛そう、ボリュームがある等）」が分かれば、一言添えて魅力を伝えてください。
+                - ユーザーが料理のイメージができるような丁寧なガイドを心がけてください。
+                """
+
+            prompt = f"""
+            役割設定:
+            あなたは視覚障害者の外食をサポートするパートナー「Runwith Menu AI」です。
+            メニュー画像を解析し、ユーザーが料理を選びやすいように整理してガイドしてください。
+
+            重要ミッション:
+            1. メニュー全体を【5つ〜8つ程度の論理的なチャプター（カテゴリー）】に分けてください。
+               （悪い例：各商品を1つのチャプターにする）
+               （良い例：「前菜」「メイン」「ドリンク」のようにまとめる）
+            
+            2. 読み上げ原稿のルール:
+               - 商品名ははっきりと。価格は必ず「円」をつけて読む。
+               - アレルギー情報や注意事項は絶対に省略しない。
+               {mode_instruction}
+
+            ★最重要：以下の固有名詞・読み方辞書を必ず守ってください。
+            {user_dict_str}
+
+            出力フォーマット（JSONのみ）:
+            [
+              {{"title": "カテゴリー名（例：おすすめ・フェア）", "text": "読み上げテキスト..."}},
+              {{"title": "カテゴリー名（例：メイン料理）", "text": "読み上げテキスト..."}}
+            ]
+            """
+            
+            inputs = [prompt]
+            if final_image_list:
+                for f in final_image_list:
+                    f.seek(0)
+                    inputs.append({"mime_type": f.type if hasattr(f, 'type') else "image/jpeg", "data": f.getvalue()})
+            elif target_url:
+                web_text = fetch_text_from_url(target_url)
+                inputs.append(web_text[:30000] if web_text else "")
+
+            resp = model.generate_content(inputs)
+            
+            text_resp = resp.text
+            match = re.search(r'\[.*\]', text_resp, re.DOTALL)
+            if not match: raise Exception("AIからの応答がJSON形式ではありませんでした。")
+            menu_data = json.loads(match.group())
+
+            intro_t = f"こんにちは、{store_name}です。"
+            if menu_title: intro_t += f"ただいまより{menu_title}をご紹介します。"
+            intro_t += "このプレイヤーは、スクリーンリーダーでの操作に対応しています。"
+            intro_t += f"このメニューは、全部で{len(menu_data)}つのカテゴリーに分かれています。まずは目次です。"
+            
+            for i, tr in enumerate(menu_data): 
+                intro_t += f"{i+1}、{tr['title']}。"
+                
+            intro_t += "それではどうぞ。"
+            menu_data.insert(0, {"title": "はじめに・目次", "text": intro_t})
+
+            progress_bar = st.progress(0)
+            generated_tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value, progress_bar))
+            
+            html_content = create_standalone_html_player(store_name, generated_tracks, map_url)
+            
+            date_str = datetime.now().strftime('%Y%m%d')
+            safe_name = sanitize_filename(store_name)
+            zip_name = f"Runwith_{safe_name}_{date_str}.zip"
+            zip_path = os.path.abspath(zip_name)
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("index.html", html_content)
+
+            with open(zip_path, "rb") as f:
+                zip_data = f.read()
+
+            st.session_state.generated_result = {
+                "tracks": generated_tracks,
+                "html_content": html_content,
+                "html_name": f"{safe_name}_player.html",
+                "zip_data": zip_data,
+                "zip_name": zip_name,
+                "store_name": store_name
+            }
+            st.success("✨ 完成しました！")
+            st.balloons()
+            
+        except Exception as e:
+            st.error(f"エラーが発生しました: {e}")
+
+# Step 4: 結果出力 & 店頭POP
+if st.session_state.generated_result:
+    res = st.session_state.generated_result
+    
+    st.markdown("---")
+    st.markdown("### ▶️ プレビュー")
+    render_preview_player(res["tracks"])
+
+    st.markdown("---")
+    st.markdown("### 📥 保存")
+    
+    st.info("""
+    **Webプレイヤー**：アクセシビリティ対応済みのHTMLファイルです。スマホへの保存やLINE共有に便利です。  
+    **ZIPファイル**：PCでの保存や、My Menu Bookへの追加にご利用ください。
+    """)
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button(
+            f"🌐 Webプレイヤー ({res['html_name']})",
+            res['html_content'],
+            res['html_name'],
+            "text/html",
+            type="primary"
+        )
+    with c2:
+        st.download_button(
+            f"📦 ZIPファイル ({res['zip_name']})",
+            data=res["zip_data"],
+            file_name=res['zip_name'],
+            mime="application/zip"
+        )
+
+    st.markdown("---")
+    st.markdown("### 🏪 店頭用POP作成")
+    st.warning("⚠️ まずは、ダウンロードしたHTMLファイルをインターネット上に公開（アップロード）してください。")
+    
+    public_url = st.text_input("公開したURLを入力 (例: https://my-shop.com/menu.html)", key="pop_url")
+    
+    if public_url:
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={public_url}"
+        
+        pop_html = f"""
+        <div style="border:6px solid #001F3F; padding:30px; background:white; text-align:center; max-width:400px; margin:0 auto; border-radius:20px; color:#001F3F; font-family:sans-serif;">
+            <h2 style="color:#001F3F; border-bottom:4px solid #FF851B; display:inline-block; padding-bottom:5px;">🎧 音声メニュー</h2>
+            <p style="font-weight:bold; font-size:18px;">スマホでメニューを読み上げます</p>
+            <img src="{qr_url}" style="width:200px; border:2px solid #ddd; padding:10px; margin:20px 0;">
+            <div style="background:#FFD59E; padding:15px; border-radius:10px; text-align:left; font-size:14px;">
+                <strong>使い方：</strong><br>
+                1. カメラでQRコードを読み取る<br>
+                2. 再生ボタンを押す
+            </div>
+            <p style="margin-top:15px; font-weight:bold;">{res['store_name']}</p>
+        </div>
+        """
+        components.html(pop_html, height=600, scrolling=True)
