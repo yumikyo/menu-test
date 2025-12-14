@@ -29,7 +29,7 @@ nest_asyncio.apply()
 st.set_page_config(page_title="Runwith Menu AI Generator", layout="wide", page_icon="🎧")
 
 # ----------------------------
-# CSS: ハイコントラスト & 高齢者対応デザイン
+# CSS: ハイコントラスト & 高齢者対応デザイン (Runwith Brand)
 # ----------------------------
 st.markdown("""
 <style>
@@ -150,9 +150,8 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         save_path = os.path.join(output_dir, filename)
         speech_text = track['text']
         
-        # 0番は「はじめに・目次」なので番号付けなし
         if i > 0:
-            speech_text = f"{i}番、{track['title']}。\n{track['text']}"
+            speech_text = f"{i}、{track['title']}。\n{track['text']}"
             
         tasks.append(generate_single_track_fast(speech_text, save_path, voice_code, rate_value))
         track_info_list.append({"title": track['title'], "path": save_path})
@@ -166,7 +165,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     return track_info_list
 
 # ----------------------------
-# HTMLプレイヤー生成（JS埋め込み完全版）
+# HTMLプレイヤー生成（JS埋め込み完全版・Runwithデザイン）
 # ----------------------------
 
 def create_standalone_html_player(store_name, menu_data, map_url=""):
@@ -280,7 +279,7 @@ init();
     return final_html
 
 # ----------------------------
-# プレビュー用プレイヤー（改良版）
+# プレビュー用プレイヤー（改良版・Runwithデザイン）
 # ----------------------------
 
 def render_preview_player(tracks):
@@ -295,7 +294,6 @@ def render_preview_player(tracks):
                 })
     playlist_json = json.dumps(playlist_data)
     
-    # Runwithカラー(紺・オレンジ)を適用しつつ、リファレンスコードの構造を採用
     html_template = """<!DOCTYPE html><html><head><style>
     body{margin:0;padding:0;font-family:sans-serif;}
     .p-box{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}
@@ -376,10 +374,10 @@ with st.sidebar:
     
     st.divider()
     st.header("🗣️ 音声設定")
-    voice_options = {"👩 女性 (Nanami)": "ja-JP-NanamiNeural", "👨 男性 (Keita)": "ja-JP-KeitaNeural"}
+    voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
     selected_voice = st.radio("声の種類", list(voice_options.keys()), horizontal=True)
     voice_code = voice_options[selected_voice]
-    rate_value = "+0%"
+    rate_value = "+10%"
 
     st.divider()
     st.header("📝 読み上げモード")
@@ -444,6 +442,8 @@ with col2:
     menu_title = st.text_input("📖 メニュー名（任意）", placeholder="例：ランチメニュー")
 
 map_url = st.text_input("📍 GoogleマップURL（任意）", placeholder="https://goo.gl/maps/...")
+# ★常時表示に修正済み
+st.caption("※プレイヤーに地図へのアクセスボタンが表示されます。")
 
 st.markdown("---")
 
@@ -518,7 +518,7 @@ st.markdown("### 🚀 3. 音声メニュー生成")
 can_run = (final_image_list or target_url) and api_key and store_name and st.session_state.retake_index is None
 
 if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not can_run, use_container_width=True):
-    with st.spinner('AIがメニューを解析して音声を生成中...'):
+    with st.spinner('Runwith Menu AI が解析中...'):
         output_dir = "menu_audio_temp"
         if os.path.exists(output_dir): shutil.rmtree(output_dir)
         os.makedirs(output_dir, exist_ok=True)
@@ -527,22 +527,28 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(target_model_name)
             
-            # プロンプト作成
-            mode_desc = "商品名と価格のみ簡潔に" if "シンプル" in reading_mode else "視覚障害者がイメージしやすいよう、味や見た目の特徴を補足して"
+            # 辞書データの取得
+            user_dict_str = json.dumps(user_dict, ensure_ascii=False)
+            
+            # ★プロンプト更新（指定の形式へ）
             prompt = f"""
-            あなたは視覚障害者のためのメニュー読み上げAIです。
-            以下のメニュー情報から、聴き取りやすいチャプター形式の原稿を作成してください。
+            あなたは視覚障害者のためのメニュー読み上げデータ作成のプロです。
+            メニューの内容を解析し、聞きやすいように【5つ〜8つ程度の大きなカテゴリー】に分類してまとめてください。
             
-            【ルール】
-            1. メニューを論理的なグループ（前菜、メイン、ドリンクなど）に分け、5〜8個のチャプターにする。
-            2. 各チャプターにはタイトルと、読み上げ原稿を含める。
-            3. 読み上げ方針: {mode_desc}
-            4. 固有名詞の読み方辞書: {json.dumps(user_dict, ensure_ascii=False)} (これに従うこと)
+            重要ルール:
+            1. メニュー項目1つごとに1つのカテゴリーを作らないこと。
+            2. 「前菜・サラダ」「メイン料理」「ご飯・麺」「ドリンク」「デザート」のようにグループ化する。
+            3. カテゴリー内のメニューは、挨拶などを抜きにして商品名と価格をテンポよく読み上げる文章にする。
+            4. 価格の数字には必ず「円」をつけて読み上げる（例：1000 -> 1000円）。
+            5. アレルギー、辛さ、量などの重要な注意書きは、省略せず商品名の後に補足して読み上げる。
             
-            【出力JSON形式】
+            ★重要：以下の固有名詞・読み方辞書を必ず守ってください。
+            {user_dict_str}
+
+            出力フォーマット（JSONのみ）:
             [
-              {{"title": "チャプター名", "text": "読み上げ原稿..."}},
-              ...
+              {{"title": "カテゴリー名（例：前菜・サラダ）", "text": "読み上げ文（例：まずは前菜です。シーザーサラダ800円。ポテトサラダ500円。なお、ドレッシングは別添え可能です。）"}},
+              {{"title": "カテゴリー名（例：メイン料理）", "text": "読み上げ文（例：続いてメインです。ハンバーグ定食1200円。ステーキ1500円。ご飯の大盛りは無料です。）"}}
             ]
             """
             
@@ -564,11 +570,17 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
             if not match: raise Exception("AIからの応答がJSON形式ではありませんでした。")
             menu_data = json.loads(match.group())
 
-            # はじめにを追加
-            intro_text = f"こんにちは、{store_name}へようこそ。Runwith Menu AIがメニューをご案内します。"
-            if menu_title: intro_text += f"本日は、{menu_title}をご紹介します。"
-            intro_text += "それでは、ごゆっくりお選びください。"
-            menu_data.insert(0, {"title": "はじめに", "text": intro_text})
+            # ★はじめに・目次の更新（指定の形式へ）
+            intro_t = f"こんにちは、{store_name}です。"
+            if menu_title: intro_t += f"ただいまより{menu_title}をご紹介します。"
+            intro_t += "このプレイヤーは、スクリーンリーダーでの操作に対応しています。"
+            intro_t += f"このメニューは、全部で{len(menu_data)}つのカテゴリーに分かれています。まずは目次です。"
+            
+            for i, tr in enumerate(menu_data): 
+                intro_t += f"{i+1}、{tr['title']}。"
+                
+            intro_t += "それではどうぞ。"
+            menu_data.insert(0, {"title": "はじめに・目次", "text": intro_t})
 
             # 音声生成
             progress_bar = st.progress(0)
@@ -658,3 +670,4 @@ if st.session_state.generated_result:
         </div>
         """
         components.html(pop_html, height=600, scrolling=True)
+```
