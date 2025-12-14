@@ -483,7 +483,7 @@ st.markdown("""
 <div style='background: linear-gradient(135deg, #001F3F 0%, #003366 100%); color: #FF851B; padding: 30px; border-radius: 20px; text-align: center; margin-bottom: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.3);'>
     <h1 style='font-size: 2.5em; margin: 0; color: #FFFFFF;'>🎧 Runwith Menu Maker</h1>
     <p style='font-size: 1.3em; margin: 10px 0 0 0; color: #FF851B; font-weight: bold;'>
-        店舗用 音声メニュー作成ツール
+        音声メニュー作成ツール
     </p>
 </div>
 """, unsafe_allow_html=True)
@@ -493,7 +493,7 @@ if 'retake_index' not in st.session_state: st.session_state.retake_index = None
 if 'captured_images' not in st.session_state: st.session_state.captured_images = []
 if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
 if 'generated_result' not in st.session_state: st.session_state.generated_result = None
-if 'show_camera' not in st.session_state: st.session_state.show_camera = False # 互換性のため残す
+if 'show_camera' not in st.session_state: st.session_state.show_camera = False
 
 # Step 1: お店情報
 st.markdown("### 🏪 1. 店舗情報入力")
@@ -568,7 +568,7 @@ elif input_method == "📷 カメラ撮影":
 elif input_method == "🌐 Web URL":
     target_url = st.text_input("読み取りたいURL", placeholder="https://...")
 
-# 画像プレビュー & 編集
+# 画像プレビュー & 削除/再撮影
 if final_image_list and st.session_state.retake_index is None:
     st.markdown("#### ▼ 登録画像")
     cols = st.columns(3)
