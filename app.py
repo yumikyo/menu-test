@@ -159,7 +159,7 @@ def render_preview_player(tracks):
     playlist_json = json.dumps(playlist_data)
     
     # 同様にf-stringを避ける
-    html = """<!DOCTYPE html><html><head><style>body{margin:0;padding:0;font-family:sans-serif;}.p-box{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}.t-ti{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}.ctrls{display:flex;gap:10px;margin:15px 0;}button{flex:1;background-color:#FF851B;color:#001F3F;border:2px solid #001F3F;border-radius:8px;font-size:24px;padding:10px 0;cursor:pointer;font-weight:bold;}button:hover{background-color:#FF6B00;}.lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}.it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}.it:focus{outline:2px solid #001F3F;background:#eee;}.it.active{color:#FF851B;font-weight:bold;background:#001F3F;}</style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio><div class="ctrls"><button onclick="pv()">⏮</button><button onclick="tg()" id="pb">▶</button><button onclick="nx()">⏭</button></div><div id="ls" class="lst"></div></div><script>const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');function init(){rn();ld(0);}function ld(i){x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();}function tg(){if(au.paused){au.play();pb.innerText="⏸";}else{au.pause();pb.innerText="▶";}}function nx(){if(x<pl.length-1){ld(x+1);au.play();pb.innerText="⏸";}}function pv(){if(x>0){ld(x-1);au.play();pb.innerText="⏸";}}au.onended=function(){if(x<pl.length-1)nx();else pb.innerText="▶";};function rn(){ls.innerHTML="";pl.forEach((t,i)=>{const d=document.createElement('div');d.className="it "+(i===x?"active":"");let l=t.title;if(i>0){l=i+". "+t.title;}d.innerText=l;d.onclick=()=>{ld(i);au.play();pb.innerText="⏸";};ls.appendChild(d);});}init();</script></body></html>"""
+    html = """<!DOCTYPE html><html><head><style>body{margin:0;padding:0;font-family:sans-serif;}.p-box{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}.t-ti{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}.ctrls{display:flex;gap:10px;margin:15px 0;}button{flex:1;background-color:#FF851B;color:#001F3F;border:2px solid #001F3F;border-radius:8px;font-size:24px;padding:10px 0;cursor:pointer;font-weight:bold;}button:hover{background-color:#FF6B00;}.lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}.it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}.it:focus{outline:2px solid #001F3F;background:#eee;}.it.active{color:#FF851B;font-weight:bold;background:#001F3F;}</style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio><div class="ctrls"><button onclick="pv()">⏮</button><button onclick="tg()" id="pb">▶</button><button onclick="nx()">⏭</button></div><div id="ls" class="lst"></div></div><script>const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');function init(){rn();ld(0);}function ld(i){x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();}function tg(){if(au.paused){au.play();pb.innerText="⏸";}else{au.pause();pb.innerText="▶";}}function nx(){if(x<pl.length-1){ld(x+1);au.play();pb.innerText="⏸";}else{ld(0);au.pause();pb.innerText="▶";}}function pv(){if(x>0){ld(x-1);au.play();pb.innerText="⏸";}else{ld(0);au.pause();pb.innerText="▶";}}au.onended=function(){if(x<pl.length-1)nx();else pb.innerText="▶";};function rn(){ls.innerHTML="";pl.forEach((t,i)=>{const d=document.createElement('div');d.className="it "+(i===x?"active":"");let l=t.title;if(i>0){l=i+". "+t.title;}d.innerText=l;d.onclick=()=>{ld(i);au.play();pb.innerText="⏸";};ls.appendChild(d);});}init();</script></body></html>"""
     html = html.replace("__PLAYLIST__", playlist_json)
     components.html(html, height=450)
 
@@ -175,7 +175,14 @@ def render_settings_ui(container, key_suffix=""):
         api_key = None
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
-            st.success("✅ APIキー認証済み")
+            st.markdown(
+                """
+                <div style="background-color: #ff9f1c; padding: 10px; border-radius: 5px; margin-bottom: 20px;">
+                    <strong style="color: white;">✅ APIキー認証済み</strong>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
         else:
             api_key = st.text_input("🔑 Gemini APIキー (必須)", type="password", key=f"api_{key_suffix}")
         
@@ -193,10 +200,31 @@ def render_settings_ui(container, key_suffix=""):
 
         st.markdown("---")
         st.subheader("🗣️ 音声設定")
+        
+        # 声の種類
         voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
         selected_v_key = st.radio("声の種類", list(voice_options.keys()), horizontal=True, key=f"voice_{key_suffix}")
         voice_code = voice_options[selected_v_key]
         
+        # 読み上げ速度（★ここを追加しました★）
+        st.markdown("##### 🚀 読み上げ速度")
+        speed_labels = ["ゆっくり", "普通", "やや速い", "速い", "爆速"]
+        selected_speed_label = st.select_slider(
+            "速度を選択してください",
+            options=speed_labels,
+            value="やや速い",
+            key=f"speed_{key_suffix}"
+        )
+        # 速度変換マップ
+        speed_map = {
+            "ゆっくり": "-20%", 
+            "普通": "+0%", 
+            "やや速い": "+10%", 
+            "速い": "+30%", 
+            "爆速": "+50%"
+        }
+        voice_rate = speed_map[selected_speed_label]
+
         st.markdown("---")
         st.subheader("📝 読み上げモード")
         reading_mode = st.radio(
@@ -231,7 +259,7 @@ def render_settings_ui(container, key_suffix=""):
                         save_dictionary(user_dict)
                         st.rerun()
                         
-    return api_key, target_model_name, voice_code, reading_mode, user_dict
+    return api_key, target_model_name, voice_code, reading_mode, user_dict, voice_rate
 
 # ----------------------------
 # メインアプリケーション
@@ -267,13 +295,14 @@ target_model_name = None
 voice_code = "ja-JP-NanamiNeural"
 reading_mode = "💬 シンプル (商品名と価格)"
 user_dict = {}
+voice_rate = "+10%" # 初期値
 
 # --- レイアウト分岐 ---
 if not is_mobile_mode:
-    # PCモード: サイドバーに設定を表示
-    api_key, target_model_name, voice_code, reading_mode, user_dict = render_settings_ui(st.sidebar, "pc")
+    # PCモード
+    api_key, target_model_name, voice_code, reading_mode, user_dict, voice_rate = render_settings_ui(st.sidebar, "pc")
 else:
-    # モバイルモード
+    # モバイルモード用の変数確保
     pass 
 
 # --- メインコンテンツ ---
@@ -338,7 +367,7 @@ st.markdown("---")
 # モバイルモードの場合、ここに設定エリアを配置
 if is_mobile_mode:
     with st.expander("⚙️ 設定・辞書 (APIキー・音声設定など)", expanded=False):
-        api_key, target_model_name, voice_code, reading_mode, user_dict = render_settings_ui(st, "mobile")
+        api_key, target_model_name, voice_code, reading_mode, user_dict, voice_rate = render_settings_ui(st.container(), "mobile")
 
 # Step 3: 作成ボタン
 st.markdown("### 🚀 3. 作成")
@@ -361,6 +390,9 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=is_re
             os.makedirs(output_dir, exist_ok=True)
 
             try:
+                # 日付文字列をここで定義
+                date_str = datetime.now().strftime('%Y%m%d_%H%M%S')
+
                 genai.configure(api_key=api_key)
                 model = genai.GenerativeModel(target_model_name)
                 user_dict_str = json.dumps(user_dict, ensure_ascii=False)
@@ -398,12 +430,13 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=is_re
                 menu_data.insert(0, {"title": "はじめに・目次", "text": intro})
                 
                 pbar = st.progress(0)
-                tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, "+10%", pbar))
+                
+                # ★ここで設定した速度（voice_rate）を使います
+                tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, voice_rate, pbar))
                 
                 html = create_standalone_html_player(store_name, tracks, map_url)
                 
                 s_name = sanitize_filename(store_name)
-                d_str = datetime.now().strftime('%Y%m%d')
                 zip_name = f"Runwith_{s_name}_{date_str}.zip"
                 zip_path = os.path.abspath(zip_name)
                 with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as z: z.writestr("index.html", html)
@@ -431,7 +464,6 @@ if st.session_state.generated_result:
     url = st.text_input("公開URLを入力", key="pop_url")
     if url:
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={url}"
-        # 安全な文字列連結
         pop_html = """<div style="border:6px solid #001F3F;padding:30px;background:white;text-align:center;max-width:400px;margin:0 auto;border-radius:20px;color:#001F3F;font-family:sans-serif;"><h2 style="color:#001F3F;border-bottom:4px solid #FF851B;display:inline-block;padding-bottom:5px;">🎧 音声メニュー</h2><p style="font-weight:bold;font-size:18px;">スマホでメニューを読み上げます</p><img src="__QR__" style="width:200px;border:2px solid #ddd;padding:10px;margin:20px 0;"><div style="background:#FFD59E;padding:15px;border-radius:10px;text-align:left;font-size:14px;"><strong>使い方：</strong><br>1. QRコードを読み取る<br>2. 再生ボタンを押す</div><p style="margin-top:15px;font-weight:bold;">__SN__</p></div>"""
         pop_html = pop_html.replace("__QR__", qr).replace("__SN__", res['sn'])
         components.html(pop_html, height=600, scrolling=True)
