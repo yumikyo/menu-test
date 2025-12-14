@@ -71,6 +71,12 @@ st.markdown("""
     /* 選択肢（ラジオボタン等） */
     .stRadio > div { gap: 20px; }
     .stRadio label { font-size: 18px !important; }
+    
+    /* Expanderのスタイル */
+    .streamlit-expanderHeader {
+        color: #FF851B !important;
+        font-weight: bold;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -115,7 +121,6 @@ def fetch_text_from_url(url: str) -> str | None:
 
 async def generate_single_track_fast(text: str, filename: str, voice_code: str, rate_value: str) -> bool:
     """edge-tts で音声生成。失敗時は gTTS にフォールバック"""
-    # edge-tts で3回リトライ
     for attempt in range(3):
         try:
             comm = edge_tts.Communicate(text, voice_code, rate=rate_value)
@@ -125,7 +130,6 @@ async def generate_single_track_fast(text: str, filename: str, voice_code: str, 
         except Exception:
             await asyncio.sleep(1)
 
-    # gTTS フォールバック
     try:
         def gtts_task():
             tts = gTTS(text=text, lang='ja')
@@ -276,7 +280,7 @@ init();
     return final_html
 
 # ----------------------------
-# プレビュー用プレイヤー
+# プレビュー用プレイヤー（改良版）
 # ----------------------------
 
 def render_preview_player(tracks):
@@ -291,25 +295,53 @@ def render_preview_player(tracks):
                 })
     playlist_json = json.dumps(playlist_data)
     
-    html_template = """
-    <div style="background:#001F3F; color:#FF851B; padding:20px; border-radius:10px; text-align:center;">
-        <div id="p_ti" style="font-size:20px; font-weight:bold; margin-bottom:10px;">準備中</div>
-        <audio id="p_au" controls style="width:100%;"></audio>
-        <div style="text-align:left; max-height:200px; overflow-y:auto; margin-top:10px; border-top:1px solid #666;" id="p_ls"></div>
+    # Runwithカラー(紺・オレンジ)を適用しつつ、リファレンスコードの構造を採用
+    html_template = """<!DOCTYPE html><html><head><style>
+    body{margin:0;padding:0;font-family:sans-serif;}
+    .p-box{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}
+    .t-ti{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}
+    .ctrls{display:flex; gap:10px; margin:15px 0;}
+    button {
+        flex: 1;
+        background-color: #FF851B; color: #001F3F; border: 2px solid #001F3F;
+        border-radius: 8px; font-size: 24px; padding: 10px 0;
+        cursor: pointer; line-height: 1; min-height: 50px; font-weight: bold;
+    }
+    button:hover { background-color: #FF6B00; }
+    button:focus { outline: 3px solid #001F3F; outline-offset: 2px; }
+    .lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}
+    .it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}
+    .it:focus{outline:2px solid #001F3F; background:#eee;}
+    .it.active{color:#FF851B;font-weight:bold;background:#001F3F;}
+    </style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio>
+    <div class="ctrls">
+        <button onclick="pv()" aria-label="前へ">⏮</button>
+        <button onclick="tg()" id="pb" aria-label="再生">▶</button>
+        <button onclick="nx()" aria-label="次へ">⏭</button>
     </div>
+    <div style="font-size:12px;color:#666; margin-top:5px;">
+        速度:<select id="sp" onchange="sp()"><option value="0.8">0.8</option><option value="1.0" selected>1.0</option><option value="1.2">1.2</option><option value="1.5">1.5</option></select>
+    </div>
+    <div id="ls" class="lst" role="list"></div></div>
     <script>
-    const ppl=__PLAYLIST__; const pau=document.getElementById('p_au'); const pti=document.getElementById('p_ti'); const pls=document.getElementById('p_ls');
-    function p_ld(i){ pau.src=ppl[i].src; pti.innerText=ppl[i].title; }
-    ppl.forEach((t,i)=>{
-        const d=document.createElement('div'); d.innerText=(i+1)+". "+t.title;
-        d.style.padding="10px"; d.style.cursor="pointer"; d.style.borderBottom="1px solid #333";
-        d.onclick=()=>{ p_ld(i); pau.play(); }; pls.appendChild(d);
-    });
-    p_ld(0);
-    </script>
-    """
+    const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');
+    function init(){rn();ld(0);sp();}
+    function ld(i){x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();sp();}
+    function tg(){if(au.paused){au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}else{au.pause();pb.innerText="▶";pb.setAttribute("aria-label","再生");}}
+    function nx(){if(x<pl.length-1){ld(x+1);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}}
+    function pv(){if(x>0){ld(x-1);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");}}
+    function sp(){au.playbackRate=parseFloat(document.getElementById('sp').value);}
+    au.onended=function(){if(x<pl.length-1)nx();else{pb.innerText="▶";pb.setAttribute("aria-label","再生");}};
+    function rn(){ls.innerHTML="";pl.forEach((t,i)=>{
+        const d=document.createElement('div');
+        d.className="it "+(i===x?"active":"");
+        let l=t.title; if(i>0){l=i+". "+t.title;}
+        d.innerText=l;
+        d.setAttribute("role","listitem");d.setAttribute("tabindex","0");d.onclick=()=>{ld(i);au.play();pb.innerText="⏸";pb.setAttribute("aria-label","一時停止");};d.onkeydown=(e)=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();d.click();}};ls.appendChild(d);});}
+    init();</script></body></html>"""
+    
     final_html = html_template.replace("__PLAYLIST__", playlist_json)
-    components.html(final_html, height=400)
+    components.html(final_html, height=450)
 
 # ----------------------------
 # サイドバー（設定）
@@ -335,10 +367,8 @@ with st.sidebar:
     if api_key:
         try:
             genai.configure(api_key=api_key)
-            # モデル一覧を取得してフィルタリング
             all_models = list(genai.list_models())
             valid_models = [m.name for m in all_models if 'generateContent' in m.supported_generation_methods]
-            # gemini-1.5-flashをデフォルトにする
             default_idx = next((i for i, n in enumerate(valid_models) if "flash" in n.lower()), 0)
             target_model_name = st.selectbox("🤖 AIモデル", valid_models, index=default_idx)
         except Exception as e:
@@ -356,7 +386,7 @@ with st.sidebar:
     reading_mode = st.radio(
         "情報の詳しさ", 
         ("💬 シンプル (商品名と価格)", "🌟 詳細 (説明・イメージ付き)"), 
-        index=1
+        index=0
     )
 
     st.divider()
@@ -561,6 +591,7 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
             st.session_state.generated_result = {
                 "tracks": generated_tracks,
                 "html_content": html_content,
+                "html_name": f"{safe_name}_player.html",
                 "zip_data": zip_data,
                 "zip_name": zip_name,
                 "store_name": store_name
@@ -576,22 +607,33 @@ if st.session_state.generated_result:
     res = st.session_state.generated_result
     
     st.markdown("---")
-    st.markdown("### 🎵 プレビュー & ダウンロード")
+    st.markdown("### ▶️ プレビュー")
+    render_preview_player(res["tracks"])
+
+    st.markdown("---")
+    st.markdown("### 📥 保存")
     
-    col_l, col_r = st.columns([1, 1])
-    with col_l:
-        render_preview_player(res["tracks"])
+    st.info("""
+    **Webプレイヤー**：アクセシビリティ対応済みのHTMLファイルです。スマホへの保存やLINE共有に便利です。  
+    **ZIPファイル**：PCでの保存や、My Menu Bookへの追加にご利用ください。
+    """)
     
-    with col_r:
-        st.info("👇 これをダウンロードして、お店のHPにアップロードしてください。")
+    c1, c2 = st.columns(2)
+    with c1:
         st.download_button(
-            "📦 配布用ファイル (ZIP) をダウンロード",
-            data=res["zip_data"],
-            file_name=res["zip_name"],
-            mime="application/zip",
+            f"🌐 Webプレイヤー ({res['html_name']})",
+            res['html_content'],
+            res['html_name'],
+            "text/html",
             type="primary"
         )
-        st.caption("※ ZIPの中に「index.html」が入っています。これ一つで動きます。")
+    with c2:
+        st.download_button(
+            f"📦 ZIPファイル ({res['zip_name']})",
+            data=res["zip_data"],
+            file_name=res['zip_name'],
+            mime="application/zip"
+        )
 
     st.markdown("---")
     st.markdown("### 🏪 店頭用POP作成")
