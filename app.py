@@ -206,7 +206,26 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
 body { font-family: sans-serif; background: var(--bg-navy); color: var(--text-orange); margin: 0; padding: 15px; line-height: 1.8; font-size: 18px; }
 .c { max-width: 600px; margin: 0 auto; }
 h1 { text-align: center; font-size: 2em; color: var(--accent-white); border-bottom: 4px solid var(--text-orange); padding-bottom: 15px; margin-bottom: 25px; }
-.box { background: var(--bg-dark); border: 5px solid var(--text-orange); border-radius: 15px; padding: 25px; text-align: center; margin-bottom: 25px; min-height: 90px; display: flex; align-items: center; justify-content: center; }
+
+/* 再生中タイトルエリア（ボタン化） */
+.box { 
+    background: var(--bg-dark); 
+    border: 5px solid var(--text-orange); 
+    border-radius: 15px; 
+    padding: 25px; 
+    text-align: center; 
+    margin-bottom: 25px; 
+    min-height: 100px; 
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+    transition: transform 0.1s;
+}
+.box:active { transform: scale(0.98); }
+.box:hover { background-color: #004080; }
+
 .ti { font-size: 1.8em; font-weight: bold; color: var(--text-orange); }
 .ctrl-group { display: flex; flex-direction: column; gap: 20px; margin-bottom: 25px; }
 .main-ctrl { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
@@ -222,10 +241,15 @@ button.reset-btn { font-size: 1.3em; background: var(--bg-dark) !important; colo
 <main class="c" role="main">
     <h1>🎧 __STORE_NAME__</h1>
     __MAP_BUTTON__
-    <section aria-label="再生状況">
-        <div class="box"><div class="ti" id="ti" aria-live="polite">準備中...</div></div>
+    
+    <section aria-label="再生状況と操作">
+        <div class="box" onclick="toggle()" role="button" aria-label="再生・一時停止">
+            <div class="ti" id="ti" aria-live="polite">▶ 準備中...</div>
+        </div>
     </section>
+    
     <audio id="au" preload="metadata" style="opacity:0;position:absolute;"></audio>
+    
     <section class="ctrl-group">
         <button onclick="restart()" class="reset-btn">⏮ 最初に戻る</button>
         <button onclick="toggle()" id="pb">▶ 再生</button>
@@ -251,20 +275,57 @@ button.reset-btn { font-size: 1.3em; background: var(--bg-dark) !important; colo
 <script>
 const pl=__PLAYLIST_JSON__;let idx=0;
 const au=document.getElementById('au'); const ti=document.getElementById('ti'); const pb=document.getElementById('pb');
-function init(){ ren(); ld(0); csp(); }
-function ld(i){ idx=i; au.src=pl[idx].src; ti.innerText=pl[idx].title; ren(); csp(); }
-function toggle(){ if(au.paused){ au.play(); pb.innerText="⏸ 一時停止"; }else{ au.pause(); pb.innerText="▶ 再生"; } }
-function restart(){ idx=0; ld(0); au.play(); pb.innerText="⏸ 一時停止"; }
-function next(){ if(idx<pl.length-1){ ld(idx+1); au.play(); pb.innerText="⏸ 一時停止"; } }
-function prev(){ if(idx>0){ ld(idx-1); au.play(); pb.innerText="⏸ 一時停止"; } }
+
+function init(){ ren(); ld(0); csp(); updateTitleUI(); }
+
+function ld(i){ idx=i; au.src=pl[idx].src; updateTitleUI(); ren(); csp(); }
+
+function updateTitleUI() {
+    // 再生状態に合わせてアイコンを切り替え
+    const icon = au.paused ? "▶" : "⏸";
+    ti.innerText = icon + " " + pl[idx].title;
+}
+
+function toggle(){ 
+    if(au.paused){ 
+        au.play(); 
+        pb.innerText="⏸ 一時停止"; 
+    }else{ 
+        au.pause(); 
+        pb.innerText="▶ 再生"; 
+    } 
+    updateTitleUI();
+}
+
+function restart(){ idx=0; ld(0); au.play(); pb.innerText="⏸ 一時停止"; updateTitleUI(); }
+
+function next(){ 
+    if(idx<pl.length-1){ ld(idx+1); au.play(); pb.innerText="⏸ 一時停止"; }
+    updateTitleUI();
+}
+
+function prev(){ 
+    if(idx>0){ ld(idx-1); au.play(); pb.innerText="⏸ 一時停止"; }
+    updateTitleUI();
+}
+
 function csp(){ au.playbackRate=parseFloat(document.getElementById('sp').value); }
-au.onended=function(){ if(idx<pl.length-1){ next(); } else { pb.innerText="▶ 再生"; idx=0; ld(0); au.pause(); } };
+
+au.onended=function(){ 
+    if(idx<pl.length-1){ next(); } 
+    else { pb.innerText="▶ 再生"; idx=0; ld(0); au.pause(); updateTitleUI(); } 
+};
+
+au.onplay = function() { pb.innerText="⏸ 一時停止"; updateTitleUI(); };
+au.onpause = function() { pb.innerText="▶ 再生"; updateTitleUI(); };
+
 function ren(){
     const d=document.getElementById('ls'); d.innerHTML="";
     pl.forEach((t,i)=>{
         const m=document.createElement('div'); m.className="itm "+(i===idx?"active":"");
         let label = t.title; if(i > 0){ label = i + ". " + t.title; }
-        m.innerText=label; m.onclick=()=>{ ld(i); au.play(); pb.innerText="⏸ 一時停止"; };
+        m.innerText=label; 
+        m.onclick=()=>{ ld(i); au.play(); pb.innerText="⏸ 一時停止"; };
         d.appendChild(m);
     });
 }
@@ -374,11 +435,10 @@ with st.sidebar:
     
     st.divider()
     st.header("🗣️ 音声設定")
-    # ★変更点：表示名を「女性」「男性」のみに変更
+    # 表示名シンプル化、デフォルト速度+10%
     voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
     selected_voice = st.radio("声の種類", list(voice_options.keys()), horizontal=True)
     voice_code = voice_options[selected_voice]
-    # ★変更点：デフォルト速度を+10%に
     rate_value = "+10%"
 
     st.divider()
@@ -433,7 +493,7 @@ if 'retake_index' not in st.session_state: st.session_state.retake_index = None
 if 'captured_images' not in st.session_state: st.session_state.captured_images = []
 if 'camera_key' not in st.session_state: st.session_state.camera_key = 0
 if 'generated_result' not in st.session_state: st.session_state.generated_result = None
-if 'show_camera' not in st.session_state: st.session_state.show_camera = False
+if 'show_camera' not in st.session_state: st.session_state.show_camera = False # 互換性のため残す
 
 # Step 1: お店情報
 st.markdown("### 🏪 1. 店舗情報入力")
@@ -461,33 +521,46 @@ if input_method == "📂 ファイル選択":
         final_image_list.extend(uploaded_files)
 
 elif input_method == "📷 カメラ撮影":
+    st.caption("※ブラウザのカメラ許可を「許可」に設定してください。")
+    
+    # 撮り直しモード
     if st.session_state.retake_index is not None:
-        st.warning("🔄 再撮影中...")
+        st.warning(f"No.{st.session_state.retake_index + 1} を再撮影中...")
         cam_file = st.camera_input("再撮影", key=f"retake_{st.session_state.camera_key}")
-        if cam_file and st.button("決定"):
-            st.session_state.captured_images[st.session_state.retake_index] = cam_file
-            st.session_state.retake_index = None
-            st.session_state.camera_key += 1
-            st.rerun()
-    else:
-        if st.button("カメラ起動"):
-            st.session_state.show_camera = True
-            st.rerun()
         
-        if st.session_state.show_camera:
-            cam_file = st.camera_input("撮影", key=f"cam_{st.session_state.camera_key}")
-            if cam_file:
-                if st.button("➕ 追加して次へ"):
+        c1, c2 = st.columns(2)
+        with c1:
+            if cam_file and st.button("決定 (上書き)"):
+                st.session_state.captured_images[st.session_state.retake_index] = cam_file
+                st.session_state.retake_index = None
+                st.session_state.camera_key += 1
+                st.rerun()
+        with c2:
+            if st.button("キャンセル"):
+                st.session_state.retake_index = None
+                st.rerun()
+    else:
+        # 通常撮影モード（常に表示）
+        cam_file = st.camera_input("メニューを撮影", key=f"cam_{st.session_state.camera_key}")
+        
+        if cam_file:
+            col1, col2 = st.columns(2)
+            with col1:
+                # 続けて撮影
+                if st.button("➕ 追加して次へ", type="primary"):
                     st.session_state.captured_images.append(cam_file)
                     st.session_state.camera_key += 1
                     st.rerun()
-                if st.button("✅ 撮影終了"):
+            with col2:
+                # 撮影終了
+                if st.button("✅ 撮影終了 (次へ)"):
                     st.session_state.captured_images.append(cam_file)
-                    st.session_state.show_camera = False
+                    st.session_state.camera_key += 1
                     st.rerun()
     
+    # 撮影済みリストの表示
     if st.session_state.captured_images and st.session_state.retake_index is None:
-        if st.button("全削除"):
+        if st.button("🗑️ 全て削除"):
             st.session_state.captured_images = []
             st.rerun()
         final_image_list.extend(st.session_state.captured_images)
@@ -495,7 +568,7 @@ elif input_method == "📷 カメラ撮影":
 elif input_method == "🌐 Web URL":
     target_url = st.text_input("読み取りたいURL", placeholder="https://...")
 
-# 画像プレビュー & 削除/再撮影
+# 画像プレビュー & 編集
 if final_image_list and st.session_state.retake_index is None:
     st.markdown("#### ▼ 登録画像")
     cols = st.columns(3)
