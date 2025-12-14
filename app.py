@@ -1,4 +1,4 @@
-import streamlit as st
+   import streamlit as st
 import os
 import asyncio
 import json
@@ -165,7 +165,7 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
     return track_info_list
 
 # ----------------------------
-# HTMLプレイヤー生成（JS埋め込み完全版・Runwithデザイン）
+# HTMLプレイヤー生成（JS埋め込み完全版・Runwithデザイン・クリック再生対応）
 # ----------------------------
 
 def create_standalone_html_player(store_name, menu_data, map_url=""):
@@ -190,7 +190,7 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
                role="button" 
                aria-label="Googleマップを開く（{store_name}の場所）" 
                class="map-btn">
-                🗺️ 地図を開く
+               🗺️ 地図を開く
             </a>
         </div>
         """
@@ -222,6 +222,7 @@ h1 { text-align: center; font-size: 2em; color: var(--accent-white); border-bott
     cursor: pointer;
     box-shadow: 0 4px 10px rgba(0,0,0,0.3);
     transition: transform 0.1s;
+    user-select: none;
 }
 .box:active { transform: scale(0.98); }
 .box:hover { background-color: #004080; }
@@ -244,7 +245,7 @@ button.reset-btn { font-size: 1.3em; background: var(--bg-dark) !important; colo
     
     <section aria-label="再生状況と操作">
         <div class="box" onclick="toggle()" role="button" aria-label="再生・一時停止">
-            <div class="ti" id="ti" aria-live="polite">▶ 準備中...</div>
+            <div class="ti" id="ti" aria-live="polite">▶ 読み込み中...</div>
         </div>
     </section>
     
@@ -281,7 +282,6 @@ function init(){ ren(); ld(0); csp(); updateTitleUI(); }
 function ld(i){ idx=i; au.src=pl[idx].src; updateTitleUI(); ren(); csp(); }
 
 function updateTitleUI() {
-    // 再生状態に合わせてアイコンを切り替え
     const icon = au.paused ? "▶" : "⏸";
     ti.innerText = icon + " " + pl[idx].title;
 }
@@ -510,7 +510,6 @@ st.markdown("---")
 
 # Step 2: メニュー登録
 st.markdown("### 📸 2. メニュー素材の登録")
-# ★修正点：デフォルトを「📂 ファイル選択」に設定
 input_method = st.radio("入力方法", ("📂 ファイル選択", "📷 カメラ撮影", "🌐 Web URL"), index=0, horizontal=True)
 
 final_image_list = []
