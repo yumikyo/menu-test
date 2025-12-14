@@ -124,6 +124,9 @@ async def process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value,
         progress_bar.progress(completed / total)
     return track_info_list
 
+# ----------------------------
+# HTML生成関数（安全なreplace方式）
+# ----------------------------
 def create_standalone_html_player(store_name, menu_data, map_url=""):
     playlist_js = []
     for track in menu_data:
@@ -137,8 +140,13 @@ def create_standalone_html_player(store_name, menu_data, map_url=""):
     if map_url:
         map_btn = f"""<div style="text-align:center;margin-bottom:20px;"><a href="{map_url}" target="_blank" role="button" aria-label="Googleマップを開く" class="map-btn">🗺️ 地図を開く</a></div>"""
 
-    # 5px -> 8px など微調整済みHTML
-    html = f"""<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>{store_name} 音声メニュー</title><style>:root{{--bg:#001F3F;--or:#FF851B;--wh:#FFFFFF;--dk:#003366;}}body{{font-family:sans-serif;background:var(--bg);color:var(--or);margin:0;padding:15px;line-height:1.8;font-size:18px;}}.c{{max-width:600px;margin:0 auto;}}h1{{text-align:center;color:var(--wh);border-bottom:4px solid var(--or);padding-bottom:15px;}}.box{{background:var(--dk);border:5px solid var(--or);border-radius:15px;padding:25px;text-align:center;margin-bottom:25px;min-height:90px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 6px rgba(0,0,0,0.3);}}.ti{{font-size:1.8em;font-weight:bold;color:var(--or);}}.ctrl-group{{display:flex;flex-direction:column;gap:20px;margin-bottom:25px;}}.main-ctrl{{display:grid;grid-template-columns:1fr 1fr;gap:20px;}}button{{width:100%;padding:25px 0;font-size:1.8em;font-weight:bold;color:var(--bg)!important;background:var(--or)!important;border:3px solid var(--wh);border-radius:15px;cursor:pointer;min-height:80px;}}button.reset-btn{{font-size:1.3em;background:var(--dk)!important;color:var(--wh)!important;border-color:var(--or);}}.map-btn{{display:block;width:100%;padding:25px;background-color:var(--wh);color:var(--bg)!important;text-decoration:none;border-radius:15px;font-size:1.6em;font-weight:bold;border:3px solid var(--or);box-sizing:border-box;text-align:center;}}.lst{{border-top:4px solid var(--or);padding-top:20px;margin-top:25px;}}.itm{{padding:25px 15px;border-bottom:2px solid #666;cursor:pointer;font-size:1.4em;color:var(--wh);border-radius:10px;}}.itm.active{{background:var(--or)!important;color:var(--bg)!important;font-weight:bold;border-left:12px solid var(--wh);}}</style></head><body><main class="c" role="main"><h1>🎧 {store_name}</h1>{map_btn}<section aria-label="再生操作"><div class="box" onclick="toggle()" role="button" aria-label="再生・一時停止"><div class="ti" id="ti" aria-live="polite">▶ 準備中...</div></div></section><audio id="au" preload="metadata" style="opacity:0;position:absolute;"></audio><section class="ctrl-group"><button onclick="restart()" class="reset-btn">⏮ 最初に戻る</button><button onclick="toggle()" id="pb">▶ 再生</button><div class="main-ctrl"><button onclick="prev()">⏮ 前</button><button onclick="next()">次 ⏭</button></div></section><div style="text-align:center;margin:25px 0;padding:20px;background:var(--dk);border-radius:12px;"><label style="font-size:1.4em;color:var(--wh);">速度:</label><select id="sp" onchange="csp()" style="font-size:1.4em;padding:10px;border-radius:8px;"><option value="0.8">0.8</option><option value="1.0">1.0</option><option value="1.2">1.2</option><option value="1.5">1.5</option></select></div><section><h2>📜 メニュー</h2><div id="ls" class="lst" role="list"></div></section></main><script>const pl={playlist_json_str};let idx=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');function init(){{ren();ld(0);csp();upT();}}function ld(i){{idx=i;au.src=pl[idx].src;upT();ren();csp();}}function upT(){{const ic=au.paused?"▶":"⏸";ti.innerText=ic+" "+pl[idx].title;}}function toggle(){{if(au.paused){{au.play();pb.innerText="⏸ 一時停止";}}else{{au.pause();pb.innerText="▶ 再生";}}upT();}}function restart(){{idx=0;ld(0);au.play();pb.innerText="⏸ 一時停止";upT();}}function next(){{if(idx<pl.length-1){{ld(idx+1);au.play();pb.innerText="⏸ 一時停止";}}upT();}}function prev(){{if(idx>0){{ld(idx-1);au.play();pb.innerText="⏸ 一時停止";}}upT();}}function csp(){{au.playbackRate=parseFloat(document.getElementById('sp').value);}}au.onended=function(){{if(idx<pl.length-1){{next();}}else{{pb.innerText="▶ 再生";idx=0;ld(0);au.pause();upT();}}}};au.onplay=()=>{pb.innerText="⏸ 一時停止";upT();};au.onpause=()=>{pb.innerText="▶ 再生";upT();};function ren(){{const d=document.getElementById('ls');d.innerHTML="";pl.forEach((t,i)=>{{const m=document.createElement('div');m.className="itm "+(i===idx?"active":"");m.setAttribute("role","listitem");let l=t.title;if(i>0){{l=i+". "+t.title;}}m.innerText=l;m.onclick=()=>{{ld(i);au.play();pb.innerText="⏸ 一時停止";}};d.appendChild(m);}});}}init();</script></body></html>"""
+    # エラー回避のため、f-stringを使わずに通常の文字列として定義
+    html = """<!DOCTYPE html><html lang="ja"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><title>__STORE_NAME__ 音声メニュー</title><style>:root{--bg:#001F3F;--or:#FF851B;--wh:#FFFFFF;--dk:#003366;}body{font-family:sans-serif;background:var(--bg);color:var(--or);margin:0;padding:15px;line-height:1.8;font-size:18px;}.c{max-width:600px;margin:0 auto;}h1{text-align:center;color:var(--wh);border-bottom:4px solid var(--or);padding-bottom:15px;}.box{background:var(--dk);border:5px solid var(--or);border-radius:15px;padding:25px;text-align:center;margin-bottom:25px;min-height:90px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 6px rgba(0,0,0,0.3);}.ti{font-size:1.8em;font-weight:bold;color:var(--or);}.ctrl-group{display:flex;flex-direction:column;gap:20px;margin-bottom:25px;}.main-ctrl{display:grid;grid-template-columns:1fr 1fr;gap:20px;}button{width:100%;padding:25px 0;font-size:1.8em;font-weight:bold;color:var(--bg)!important;background:var(--or)!important;border:3px solid var(--wh);border-radius:15px;cursor:pointer;min-height:80px;}button.reset-btn{font-size:1.3em;background:var(--dk)!important;color:var(--wh)!important;border-color:var(--or);}.map-btn{display:block;width:100%;padding:25px;background-color:var(--wh);color:var(--bg)!important;text-decoration:none;border-radius:15px;font-size:1.6em;font-weight:bold;border:3px solid var(--or);box-sizing:border-box;text-align:center;}.lst{border-top:4px solid var(--or);padding-top:20px;margin-top:25px;}.itm{padding:25px 15px;border-bottom:2px solid #666;cursor:pointer;font-size:1.4em;color:var(--wh);border-radius:10px;}.itm.active{background:var(--or)!important;color:var(--bg)!important;font-weight:bold;border-left:12px solid var(--wh);}</style></head><body><main class="c" role="main"><h1>🎧 __STORE_NAME__</h1>__MAP_BUTTON__<section aria-label="再生操作"><div class="box" onclick="toggle()" role="button" aria-label="再生・一時停止"><div class="ti" id="ti" aria-live="polite">▶ 準備中...</div></div></section><audio id="au" preload="metadata" style="opacity:0;position:absolute;"></audio><section class="ctrl-group"><button onclick="restart()" class="reset-btn">⏮ 最初に戻る</button><button onclick="toggle()" id="pb">▶ 再生</button><div class="main-ctrl"><button onclick="prev()">⏮ 前</button><button onclick="next()">次 ⏭</button></div></section><div style="text-align:center;margin:25px 0;padding:20px;background:var(--dk);border-radius:12px;"><label style="font-size:1.4em;color:var(--wh);">速度:</label><select id="sp" onchange="csp()" style="font-size:1.4em;padding:10px;border-radius:8px;"><option value="0.8">0.8</option><option value="1.0">1.0</option><option value="1.2">1.2</option><option value="1.5">1.5</option></select></div><section><h2>📜 メニュー</h2><div id="ls" class="lst" role="list"></div></section></main><script>const pl=__PLAYLIST_JSON__;let idx=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');function init(){ren();ld(0);csp();upT();}function ld(i){idx=i;au.src=pl[idx].src;upT();ren();csp();}function upT(){const ic=au.paused?"▶":"⏸";ti.innerText=ic+" "+pl[idx].title;}function toggle(){if(au.paused){au.play();pb.innerText="⏸ 一時停止";}else{au.pause();pb.innerText="▶ 再生";}upT();}function restart(){idx=0;ld(0);au.play();pb.innerText="⏸ 一時停止";upT();}function next(){if(idx<pl.length-1){ld(idx+1);au.play();pb.innerText="⏸ 一時停止";}upT();}function prev(){if(idx>0){ld(idx-1);au.play();pb.innerText="⏸ 一時停止";}upT();}function csp(){au.playbackRate=parseFloat(document.getElementById('sp').value);}au.onended=function(){if(idx<pl.length-1){next();}else{pb.innerText="▶ 再生";idx=0;ld(0);au.pause();upT();}};au.onplay=()=>{pb.innerText="⏸ 一時停止";upT();};au.onpause=()=>{pb.innerText="▶ 再生";upT();};function ren(){const d=document.getElementById('ls');d.innerHTML="";pl.forEach((t,i)=>{const m=document.createElement('div');m.className="itm "+(i===idx?"active":"");m.setAttribute("role","listitem");let l=t.title;if(i>0){l=i+". "+t.title;}m.innerText=l;m.onclick=()=>{ld(i);au.play();pb.innerText="⏸ 一時停止";};d.appendChild(m);});}init();</script></body></html>"""
+    
+    # ここで安全に置換
+    html = html.replace("__STORE_NAME__", store_name)
+    html = html.replace("__MAP_BUTTON__", map_btn)
+    html = html.replace("__PLAYLIST_JSON__", playlist_json_str)
     return html
 
 def render_preview_player(tracks):
@@ -150,7 +158,9 @@ def render_preview_player(tracks):
                 playlist_data.append({"title": track['title'], "src": f"data:audio/mp3;base64,{b64}"})
     playlist_json = json.dumps(playlist_data)
     
-    html = f"""<!DOCTYPE html><html><head><style>body{{margin:0;padding:0;font-family:sans-serif;}}.p-box{{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}}.t-ti{{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}}.ctrls{{display:flex;gap:10px;margin:15px 0;}}button{{flex:1;background-color:#FF851B;color:#001F3F;border:2px solid #001F3F;border-radius:8px;font-size:24px;padding:10px 0;cursor:pointer;font-weight:bold;}}button:hover{{background-color:#FF6B00;}}.lst{{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}}.it{{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}}.it:focus{{outline:2px solid #001F3F;background:#eee;}}.it.active{{color:#FF851B;font-weight:bold;background:#001F3F;}}</style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio><div class="ctrls"><button onclick="pv()">⏮</button><button onclick="tg()" id="pb">▶</button><button onclick="nx()">⏭</button></div><div id="ls" class="lst"></div></div><script>const pl={playlist_json};let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');function init(){{rn();ld(0);}}function ld(i){{x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();}}function tg(){{if(au.paused){{au.play();pb.innerText="⏸";}}else{{au.pause();pb.innerText="▶";}}}}function nx(){{if(x<pl.length-1){{ld(x+1);au.play();pb.innerText="⏸";}}}}function pv(){{if(x>0){{ld(x-1);au.play();pb.innerText="⏸";}}}}au.onended=function(){{if(x<pl.length-1)nx();else pb.innerText="▶";}};function rn(){{ls.innerHTML="";pl.forEach((t,i)=>{{const d=document.createElement('div');d.className="it "+(i===x?"active":"");let l=t.title;if(i>0){{l=i+". "+t.title;}}d.innerText=l;d.onclick=()=>{{ld(i);au.play();pb.innerText="⏸";}};ls.appendChild(d);}});}}init();</script></body></html>"""
+    # 同様にf-stringを避ける
+    html = """<!DOCTYPE html><html><head><style>body{margin:0;padding:0;font-family:sans-serif;}.p-box{border:3px solid #001F3F;border-radius:12px;padding:15px;background:#fcfcfc;text-align:center;}.t-ti{font-size:18px;font-weight:bold;color:#001F3F;margin-bottom:10px;padding:10px;background:#fff;border-radius:8px;border-left:5px solid #FF851B;}.ctrls{display:flex;gap:10px;margin:15px 0;}button{flex:1;background-color:#FF851B;color:#001F3F;border:2px solid #001F3F;border-radius:8px;font-size:24px;padding:10px 0;cursor:pointer;font-weight:bold;}button:hover{background-color:#FF6B00;}.lst{text-align:left;max-height:150px;overflow-y:auto;border-top:1px solid #eee;margin-top:10px;padding-top:5px;}.it{padding:8px;border-bottom:1px solid #eee;cursor:pointer;font-size:14px;}.it:focus{outline:2px solid #001F3F;background:#eee;}.it.active{color:#FF851B;font-weight:bold;background:#001F3F;}</style></head><body><div class="p-box"><div id="ti" class="t-ti">...</div><audio id="au" controls style="width:100%;height:30px;"></audio><div class="ctrls"><button onclick="pv()">⏮</button><button onclick="tg()" id="pb">▶</button><button onclick="nx()">⏭</button></div><div id="ls" class="lst"></div></div><script>const pl=__PLAYLIST__;let x=0;const au=document.getElementById('au');const ti=document.getElementById('ti');const pb=document.getElementById('pb');const ls=document.getElementById('ls');function init(){rn();ld(0);}function ld(i){x=i;au.src=pl[x].src;ti.innerText=pl[x].title;rn();}function tg(){if(au.paused){au.play();pb.innerText="⏸";}else{au.pause();pb.innerText="▶";}}function nx(){if(x<pl.length-1){ld(x+1);au.play();pb.innerText="⏸";}}function pv(){if(x>0){ld(x-1);au.play();pb.innerText="⏸";}}au.onended=function(){if(x<pl.length-1)nx();else pb.innerText="▶";};function rn(){ls.innerHTML="";pl.forEach((t,i)=>{const d=document.createElement('div');d.className="it "+(i===x?"active":"");let l=t.title;if(i>0){l=i+". "+t.title;}d.innerText=l;d.onclick=()=>{ld(i);au.play();pb.innerText="⏸";};ls.appendChild(d);});}init();</script></body></html>"""
+    html = html.replace("__PLAYLIST__", playlist_json)
     components.html(html, height=450)
 
 # ----------------------------
@@ -158,11 +168,10 @@ def render_preview_player(tracks):
 # ----------------------------
 
 def render_settings_ui(container, key_suffix=""):
-    """設定項目を描画する関数（コンテナを指定可能）"""
+    """設定項目を描画する関数"""
     with container:
         st.header("🔧 システム設定")
         
-        # APIキー
         api_key = None
         if "GEMINI_API_KEY" in st.secrets:
             api_key = st.secrets["GEMINI_API_KEY"]
@@ -170,7 +179,6 @@ def render_settings_ui(container, key_suffix=""):
         else:
             api_key = st.text_input("🔑 Gemini APIキー (必須)", type="password", key=f"api_{key_suffix}")
         
-        # モデル選択
         target_model_name = None
         valid_models = []
         if api_key:
@@ -181,12 +189,11 @@ def render_settings_ui(container, key_suffix=""):
                 default_idx = next((i for i, n in enumerate(valid_models) if "flash" in n.lower()), 0)
                 target_model_name = st.selectbox("🤖 AIモデル", valid_models, index=default_idx, key=f"model_{key_suffix}")
             except:
-                st.error("APIキーが正しくないか、有効ではありません。")
+                pass
 
         st.markdown("---")
         st.subheader("🗣️ 音声設定")
         voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
-        # ラジオボタンのキーをユニークにする
         selected_v_key = st.radio("声の種類", list(voice_options.keys()), horizontal=True, key=f"voice_{key_suffix}")
         voice_code = voice_options[selected_v_key]
         
@@ -245,10 +252,10 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# ★★★ レイアウト切替スイッチ（最上部） ★★★
+# レイアウト切替スイッチ
 layout_mode = st.radio(
-    "🖥️ 表示レイアウトを選択してください", 
-    ["📱 モバイル向け (縦一列・設定下部)", "💻 PC向け (設定サイドバー)"], 
+    "🖥️ 表示レイアウト", 
+    ["💻 PC向け (設定サイドバー)", "📱 モバイル向け (縦一列)"], 
     horizontal=True
 )
 
@@ -266,10 +273,8 @@ if not is_mobile_mode:
     # PCモード: サイドバーに設定を表示
     api_key, target_model_name, voice_code, reading_mode, user_dict = render_settings_ui(st.sidebar, "pc")
 else:
-    # モバイルモード: 設定は「メイン画面」の「Expander」の中に隠しておく（デフォルト閉じる）
-    # ※モバイルモードでは設定エリアをコンテンツの下や、Expanderに入れて邪魔にならないようにする
-    # ここではExpanderを使用
-    pass # 後ほどメインエリアに描画
+    # モバイルモード
+    pass 
 
 # --- メインコンテンツ ---
 
@@ -330,8 +335,7 @@ if final_image_list and st.session_state.retake_index is None:
 
 st.markdown("---")
 
-# モバイルモードの場合、ここに設定エリアを配置（ユーザーが見つけやすい場所、または邪魔にならない場所）
-# モバイルでは「設定」は重要な要素なので、作成ボタンの手前（または直後）にExpanderで置くのが親切です。
+# モバイルモードの場合、ここに設定エリアを配置
 if is_mobile_mode:
     with st.expander("⚙️ 設定・辞書 (APIキー・音声設定など)", expanded=False):
         api_key, target_model_name, voice_code, reading_mode, user_dict = render_settings_ui(st, "mobile")
@@ -341,19 +345,16 @@ st.markdown("### 🚀 3. 作成")
 is_retaking = st.session_state.retake_index is not None
 
 if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=is_retaking, use_container_width=True):
-    # バリデーションチェック（理由を表示）
     errors = []
-    if not api_key: errors.append("❌ APIキーが設定されていません。（設定エリアを確認してください）")
+    if not api_key: errors.append("❌ APIキーが設定されていません。")
     if not store_name: errors.append("❌ 店舗名が入力されていません。")
     if not (final_image_list or target_url): errors.append("❌ メニューの画像、またはURLが指定されていません。")
     if api_key and not target_model_name: errors.append("❌ AIモデルが取得できませんでした。APIキーが正しいか確認してください。")
 
     if errors:
         st.error("以下の理由で作成できませんでした：")
-        for e in errors:
-            st.error(e)
+        for e in errors: st.error(e)
     else:
-        # 実行処理
         with st.spinner('AIがメニューを解析して音声を生成中...'):
             output_dir = "menu_audio_temp"
             if os.path.exists(output_dir): shutil.rmtree(output_dir)
@@ -418,22 +419,19 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=is_re
 # Step 4: 結果
 if st.session_state.generated_result:
     res = st.session_state.generated_result
-    st.markdown("---")
-    st.markdown("### ▶️ プレビュー")
+    st.markdown("---"); st.markdown("### ▶️ プレビュー")
     render_preview_player(res["tracks"])
-    
-    st.markdown("---")
-    st.markdown("### 📥 保存")
+    st.markdown("---"); st.markdown("### 📥 保存")
     st.info("Webプレイヤーはスマホ・LINE共有用、ZIPはPC保存用です。")
     c1, c2 = st.columns(2)
     with c1: st.download_button(f"🌐 Webプレイヤー", res['html'], res['html_n'], "text/html", type="primary", use_container_width=True)
     with c2: st.download_button(f"📦 ZIPファイル", res['zip'], res['zip_n'], "application/zip", use_container_width=True)
     
-    st.markdown("---")
-    st.markdown("### 🏪 店頭用POP")
+    st.markdown("---"); st.markdown("### 🏪 店頭用POP")
     url = st.text_input("公開URLを入力", key="pop_url")
     if url:
         qr = f"https://api.qrserver.com/v1/create-qr-code/?size=300x300&data={url}"
-        # エラーが出ないようf-stringを修正
-        pop_html = f"""<div style="border:6px solid #001F3F;padding:30px;background:white;text-align:center;max-width:400px;margin:0 auto;border-radius:20px;color:#001F3F;font-family:sans-serif;"><h2 style="color:#001F3F;border-bottom:4px solid #FF851B;display:inline-block;padding-bottom:5px;">🎧 音声メニュー</h2><p style="font-weight:bold;font-size:18px;">スマホでメニューを読み上げます</p><img src="{qr}" style="width:200px;border:2px solid #ddd;padding:10px;margin:20px 0;"><div style="background:#FFD59E;padding:15px;border-radius:10px;text-align:left;font-size:14px;"><strong>使い方：</strong><br>1. QRコードを読み取る<br>2. 再生ボタンを押す</div><p style="margin-top:15px;font-weight:bold;">{res['sn']}</p></div>"""
+        # 安全な文字列連結
+        pop_html = """<div style="border:6px solid #001F3F;padding:30px;background:white;text-align:center;max-width:400px;margin:0 auto;border-radius:20px;color:#001F3F;font-family:sans-serif;"><h2 style="color:#001F3F;border-bottom:4px solid #FF851B;display:inline-block;padding-bottom:5px;">🎧 音声メニュー</h2><p style="font-weight:bold;font-size:18px;">スマホでメニューを読み上げます</p><img src="__QR__" style="width:200px;border:2px solid #ddd;padding:10px;margin:20px 0;"><div style="background:#FFD59E;padding:15px;border-radius:10px;text-align:left;font-size:14px;"><strong>使い方：</strong><br>1. QRコードを読み取る<br>2. 再生ボタンを押す</div><p style="margin-top:15px;font-weight:bold;">__SN__</p></div>"""
+        pop_html = pop_html.replace("__QR__", qr).replace("__SN__", res['sn'])
         components.html(pop_html, height=600, scrolling=True)
