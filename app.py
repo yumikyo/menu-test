@@ -359,7 +359,7 @@ with st.sidebar:
     else:
         api_key = st.text_input("🔑 Gemini APIキー", type="password")
     
-    # モデル選択（GenerateContent対応モデルのみ）
+    # モデル選択
     valid_models = []
     target_model_name = None
     if api_key:
@@ -374,9 +374,11 @@ with st.sidebar:
     
     st.divider()
     st.header("🗣️ 音声設定")
+    # ★変更点：表示名を「女性」「男性」のみに変更
     voice_options = {"👩 女性": "ja-JP-NanamiNeural", "👨 男性": "ja-JP-KeitaNeural"}
     selected_voice = st.radio("声の種類", list(voice_options.keys()), horizontal=True)
     voice_code = voice_options[selected_voice]
+    # ★変更点：デフォルト速度を+10%に
     rate_value = "+10%"
 
     st.divider()
@@ -442,7 +444,6 @@ with col2:
     menu_title = st.text_input("📖 メニュー名（任意）", placeholder="例：ランチメニュー")
 
 map_url = st.text_input("📍 GoogleマップURL（任意）", placeholder="https://goo.gl/maps/...")
-# ★常時表示に修正済み
 st.caption("※プレイヤーに地図へのアクセスボタンが表示されます。")
 
 st.markdown("---")
@@ -527,10 +528,8 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
             genai.configure(api_key=api_key)
             model = genai.GenerativeModel(target_model_name)
             
-            # 辞書データの取得
             user_dict_str = json.dumps(user_dict, ensure_ascii=False)
             
-            # ★プロンプト更新（指定の形式へ）
             prompt = f"""
             あなたは視覚障害者のためのメニュー読み上げデータ作成のプロです。
             メニューの内容を解析し、聞きやすいように【5つ〜8つ程度の大きなカテゴリー】に分類してまとめてください。
@@ -561,16 +560,13 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
                 web_text = fetch_text_from_url(target_url)
                 inputs.append(web_text[:30000] if web_text else "")
 
-            # Gemini呼び出し
             resp = model.generate_content(inputs)
             
-            # JSON抽出
             text_resp = resp.text
             match = re.search(r'\[.*\]', text_resp, re.DOTALL)
             if not match: raise Exception("AIからの応答がJSON形式ではありませんでした。")
             menu_data = json.loads(match.group())
 
-            # ★はじめに・目次の更新（指定の形式へ）
             intro_t = f"こんにちは、{store_name}です。"
             if menu_title: intro_t += f"ただいまより{menu_title}をご紹介します。"
             intro_t += "このプレイヤーは、スクリーンリーダーでの操作に対応しています。"
@@ -582,14 +578,11 @@ if st.button("🎙️ 作成開始 (Runwith AI)", type="primary", disabled=not c
             intro_t += "それではどうぞ。"
             menu_data.insert(0, {"title": "はじめに・目次", "text": intro_t})
 
-            # 音声生成
             progress_bar = st.progress(0)
             generated_tracks = asyncio.run(process_all_tracks_fast(menu_data, output_dir, voice_code, rate_value, progress_bar))
             
-            # HTML生成
             html_content = create_standalone_html_player(store_name, generated_tracks, map_url)
             
-            # ZIP生成
             date_str = datetime.now().strftime('%Y%m%d')
             safe_name = sanitize_filename(store_name)
             zip_name = f"Runwith_{safe_name}_{date_str}.zip"
@@ -670,4 +663,3 @@ if st.session_state.generated_result:
         </div>
         """
         components.html(pop_html, height=600, scrolling=True)
-```
